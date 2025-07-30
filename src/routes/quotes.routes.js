@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../../prisma/client'); // Adjust based on your setup
-
+const prisma = new PrismaClient();
 // Utility to calculate premium
 const calculatePremium = (basePremium, value, yearOfManufacture, period) => {
   const currentYear = new Date().getFullYear();
