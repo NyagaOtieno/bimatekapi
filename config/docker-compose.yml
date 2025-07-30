@@ -1,0 +1,35 @@
+
+
+services:
+  db:
+    image: postgres:14
+    container_name: bimatek_db
+    restart: always
+    environment:
+      POSTGRES_USER: bimatekuser
+      POSTGRES_PASSWORD: bimatekpass
+      POSTGRES_DB: bimatekdb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  api:
+    build:
+      context: ..
+    container_name: bimatek_api
+    restart: always
+    env_file:
+      - ../.env
+    working_dir: /app
+    volumes:
+      - ..:/app
+      - /app/node_modules
+    ports:
+      - "3001:3000"  # host:container (browse via localhost:3001)
+    depends_on:
+      - db
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+volumes:
+  pgdata:

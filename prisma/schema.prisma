@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  name     String
+  email    String @unique
+  password String
+
+  quotes   Quote[]
+  policies Policy[]
+  clients  Client[] // for agents/subagents managing clients
+}
+
+model Product {
+  id           Int    @id @default(autoincrement())
+  name         String
+  description  String
+  underwriter  String
+  vehicleClass String
+  coverage     String
+  make         String
+  basePremium  Int
+
+  quotes   Quote[]
+  policies Policy[]
+}
+
+model Quote {
+  id                Int    @id @default(autoincrement())
+  price             Int
+  value             Int
+  period            Int
+  make              String
+  yearOfManufacture Int
+
+  productId Int
+  userId    Int
+
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  policy Policy?
+
+  createdAt DateTime @default(now())
+}
+
+model Policy {
+  id        Int @id @default(autoincrement())
+  quoteId   Int @unique
+  userId    Int
+  clientId  Int
+  productId Int
+
+  quote   Quote   @relation(fields: [quoteId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+  client  Client  @relation(fields: [clientId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  claims    Claim[]
+  createdAt DateTime @default(now())
+}
+
+model Client {
+  id      Int    @id @default(autoincrement())
+  name    String
+  phone   String
+  email   String
+  address String
+  userId  Int // the agent/subagent who created them
+
+  user     User     @relation(fields: [userId], references: [id])
+  policies Policy[]
+  claims   Claim[]
+}
+
+model Claim {
+  id        Int      @id @default(autoincrement())
+  policyId  Int
+  clientId  Int
+  amount    Int
+  status    String
+  reason    String
+  createdAt DateTime @default(now())
+
+  policy Policy @relation(fields: [policyId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+}

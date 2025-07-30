@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       Int     @id @default(autoincrement())
+  name     String
+  email    String  @unique
+  password String
+  quotes   Quote[]
+}
+
+model Client {
+  id       Int      @id @default(autoincrement())
+  name     String
+  email    String   @unique
+  phone    String
+  policies Policy[]
+}
+
+model Product {
+  id       Int      @id @default(autoincrement())
+  name     String
+  premium  Float
+  quotes   Quote[]
+  policies Policy[] // ✅ added reverse relation to Policy
+}
+
+model Quote {
+  id        Int   @id @default(autoincrement())
+  productId Int
+  userId    Int
+  price     Float
+
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id]) // ✅ reverse on User model
+}
+
+model Policy {
+  id        Int      @id @default(autoincrement())
+  clientId  Int
+  productId Int
+  startDate DateTime
+  endDate   DateTime
+  status    String
+
+  client  Client  @relation(fields: [clientId], references: [id])
+  product Product @relation(fields: [productId], references: [id]) // ✅ reverse on Product model
+  claims  Claim[]
+}
+
+model Claim {
+  id        Int      @id @default(autoincrement())
+  policyId  Int
+  dateFiled DateTime
+  status    String
+
+  policy Policy @relation(fields: [policyId], references: [id])
+}
