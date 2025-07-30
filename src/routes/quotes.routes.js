@@ -1,4 +1,20 @@
-// CREATE quote based on search params
+const express = require('express');
+const router = express.Router();
+const prisma = require('../../prisma/client'); // Adjust based on your setup
+
+// Utility to calculate premium
+const calculatePremium = (basePremium, value, yearOfManufacture, period) => {
+  const currentYear = new Date().getFullYear();
+  const age = currentYear - yearOfManufacture;
+
+  const ageFactor = age > 5 ? 1.1 : 1.0;
+  const valueFactor = value / 1_000_000;
+  const periodFactor = period / 12;
+
+  return Math.round(basePremium * valueFactor * ageFactor * periodFactor);
+};
+
+// POST /api/quotes
 router.post('/', async (req, res) => {
   const {
     vehicleClass,
@@ -7,45 +23,58 @@ router.post('/', async (req, res) => {
     value,
     make,
     yearOfManufacture,
-    userId
+    userId,
   } = req.body;
 
-  if (!vehicleClass || !coverage || !period || !value || !make || !yearOfManufacture || !userId) {
-    return res.status(400).json({ error: 'Missing required fields.' });
+  // Validate required fields
+  const requiredFields = {
+    vehicleClass,
+    coverage,
+    period,
+    value,
+    make,
+    yearOfManufacture,
+    userId,
+  };
+
+  const missingFields = Object.entries(requiredFields)
+    .filter(([_, val]) => val === undefined || val === null || val === '')
+    .map(([key]) => key);
+
+  if (missingFields.length > 0) {
+    return res.status(400).json({
+      error: `Missing required fields: ${missingFields.join(', ')}`,
+    });
   }
 
   try {
-    // Find matching product
+    // Find a matching product
     const product = await prisma.product.findFirst({
       where: {
         vehicleClass,
         coverage,
         make,
-        // Optionally filter underwriter/period if stored in the DB
-      }
+      },
     });
 
     if (!product) {
-      return res.status(404).json({ error: 'Matching product not found.' });
+      return res.status(404).json({ error: 'No matching insurance product found.' });
     }
 
-    // Calculate premium (simple example)
-    let basePremium = product.basePremium;
-
-    // Apply basic rating logic
-    const age = new Date().getFullYear() - yearOfManufacture;
-    const ageFactor = age > 5 ? 1.1 : 1.0; // +10% if older than 5 years
-    const valueFactor = value / 1000000;   // scale factor
-    const periodFactor = period / 12;      // for partial years
-
-    const finalPremium = Math.round(basePremium * valueFactor * ageFactor * periodFactor);
+    // Calculate premium
+    const premium = calculatePremium(
+      product.basePremium,
+      value,
+      yearOfManufacture,
+      period
+    );
 
     // Create the quote
     const quote = await prisma.quote.create({
       data: {
         productId: product.id,
         userId,
-        price: finalPremium,
+        price: premium,
         value,
         period,
         make,
@@ -57,9 +86,11 @@ router.post('/', async (req, res) => {
       },
     });
 
-    res.status(201).json(quote);
+    return res.status(201).json(quote);
   } catch (error) {
-    console.error('Error creating quote:', error);
-    res.status(500).json({ error: 'Failed to create quote.' });
+    console.error('❌ Error creating quote:', error);
+    return res.status(500).json({ error: 'Internal server error while creating quote.' });
   }
 });
+
+module.exports = router;
