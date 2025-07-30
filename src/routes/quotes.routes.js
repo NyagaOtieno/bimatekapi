@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const prisma = require('../lib/prisma');
+const prisma = require('../../lib/prisma');
 
 // Utility to calculate premium
 const calculatePremium = (basePremium, value, yearOfManufacture, period) => {
