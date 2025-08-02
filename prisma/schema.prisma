@@ -20,12 +20,13 @@ model User {
 model Product {
   id           Int      @id @default(autoincrement())
   name         String
-  basePremium  Int
-  coverage     String
+  basePremium  Float
   description  String
-  make         String
+  make         String?
   underwriter  String
   vehicleClass String
+  coverage     String
+  agentcode    Int 
   policies     Policy[]
   quotes       Quote[]
 }
@@ -37,6 +38,7 @@ model Quote {
   price             Int
   createdAt         DateTime @default(now())
   make              String
+  agentcode         Int 
   period            Int
   value             Int
   yearOfManufacture Int

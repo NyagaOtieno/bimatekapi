@@ -41,6 +41,7 @@ router.post('/', async (req, res) => {
     const product = await prisma.product.create({
       data: {
         name,
+        agentcode, 
         description,
         underwriter,
         vehicleClass,

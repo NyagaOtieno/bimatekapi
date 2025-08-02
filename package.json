@@ -4,7 +4,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "push": "prisma db push && prisma generate"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
