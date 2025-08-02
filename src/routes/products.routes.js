@@ -31,22 +31,34 @@ router.get('/:id', async (req, res) => {
 
 // CREATE new product
 router.post('/', async (req, res) => {
-  const { name, description, underwriter, vehicleClass, coverage, basePremium } = req.body;
+  const {
+    name,
+    description,
+    underwriter,
+    vehicleClass,
+    coverage,
+    basePremium,
+    make,
+    agentcode,
+  } = req.body;
 
-  if (!name || typeof basePremium !== 'number') {
-    return res.status(400).json({ error: 'name and numeric basePremium are required.' });
+  if (!name || typeof basePremium !== 'number' || !agentcode) {
+    return res.status(400).json({
+      error: 'Missing required fields: name, basePremium (number), and agentcode.',
+    });
   }
 
   try {
     const product = await prisma.product.create({
       data: {
         name,
-        agentcode, 
         description,
         underwriter,
         vehicleClass,
         coverage,
         basePremium,
+        make,
+        agentcode,
       },
     });
     res.status(201).json(product);
