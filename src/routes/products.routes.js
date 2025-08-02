@@ -38,14 +38,17 @@ router.post('/', async (req, res) => {
     vehicleClass,
     coverage,
     basePremium,
-    make,           // ✅ destructured
-    agentcode       // ✅ destructured
+    make,
+    agentcode
   } = req.body;
 
-  // ✅ Validate presence of required fields
-  if (!name || typeof basePremium !== 'number' || !agentcode) {
+  if (
+    !name ||
+    typeof basePremium !== 'number' ||
+    (typeof agentcode !== 'string' && typeof agentcode !== 'number')
+  ) {
     return res.status(400).json({
-      error: 'Missing required fields: name, basePremium (number), and agentcode.',
+      error: 'Missing required fields: name, basePremium (number), and agentcode.'
     });
   }
 
@@ -58,14 +61,18 @@ router.post('/', async (req, res) => {
         vehicleClass,
         coverage,
         basePremium,
-        make,       // ✅ use the variable declared above
-        agentcode   // ✅ use the variable declared above
-      },
+        make,
+        agentcode: agentcode.toString() // if agentcode is stored as String in schema
+      }
     });
+
     res.status(201).json(product);
   } catch (error) {
     console.error('❌ Error creating product:', error);
-    res.status(500).json({ error: 'Failed to create product.', detail: error.message });
+    res.status(500).json({
+      error: 'Failed to create product.',
+      detail: error.message
+    });
   }
 });
 

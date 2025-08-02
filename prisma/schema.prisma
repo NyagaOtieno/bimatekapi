@@ -26,7 +26,7 @@ model Product {
   underwriter  String
   vehicleClass String
   coverage     String
-  agentcode    Int 
+  agentcode    String
   policies     Policy[]
   quotes       Quote[]
 }
@@ -38,7 +38,7 @@ model Quote {
   price             Int
   createdAt         DateTime @default(now())
   make              String
-  agentcode         Int 
+  agentcode         String
   period            Int
   value             Int
   yearOfManufacture Int
