@@ -31,14 +31,14 @@ router.get('/:id', async (req, res) => {
 
 // CREATE new product
 router.post('/', async (req, res) => {
-  const { name, description, price } = req.body;
-  if (!name || typeof price !== 'number') {
-    return res.status(400).json({ error: 'name and numeric price are required.' });
+  const { name, description, basePremium } = req.body;
+  if (!name || typeof basePremium !== 'number') {
+    return res.status(400).json({ error: 'name and basepremium are required.' });
   }
 
   try {
     const product = await prisma.product.create({
-      data: { name, description, price },
+      data: { name, description, basePremium },
     });
     res.status(201).json(product);
   } catch (error) {

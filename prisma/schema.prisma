@@ -8,87 +8,77 @@ datasource db {
 }
 
 model User {
-  id       Int    @id @default(autoincrement())
+  id       Int      @id @default(autoincrement())
   name     String
-  email    String @unique
+  email    String   @unique
   password String
-
-  quotes   Quote[]
+  clients  Client[]
   policies Policy[]
-  clients  Client[] // for agents/subagents managing clients
+  quotes   Quote[]
 }
 
 model Product {
-  id           Int    @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   name         String
+  basePremium  Int
+  coverage     String
   description  String
+  make         String
   underwriter  String
   vehicleClass String
-  coverage     String
-  make         String
-  basePremium  Int
-
-  quotes   Quote[]
-  policies Policy[]
+  policies     Policy[]
+  quotes       Quote[]
 }
 
 model Quote {
-  id                Int    @id @default(autoincrement())
+  id                Int      @id @default(autoincrement())
+  productId         Int
+  userId            Int
   price             Int
-  value             Int
-  period            Int
+  createdAt         DateTime @default(now())
   make              String
+  period            Int
+  value             Int
   yearOfManufacture Int
-
-  productId Int
-  userId    Int
-
-  product Product @relation(fields: [productId], references: [id])
-  user    User    @relation(fields: [userId], references: [id])
-
-  policy Policy?
-
-  createdAt DateTime @default(now())
+  policy            Policy?
+  product           Product  @relation(fields: [productId], references: [id])
+  user              User     @relation(fields: [userId], references: [id])
 }
 
 model Policy {
-  id        Int @id @default(autoincrement())
-  quoteId   Int @unique
-  userId    Int
+  id        Int      @id @default(autoincrement())
   clientId  Int
   productId Int
-
-  quote   Quote   @relation(fields: [quoteId], references: [id])
-  user    User    @relation(fields: [userId], references: [id])
-  client  Client  @relation(fields: [clientId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
-
-  claims    Claim[]
   createdAt DateTime @default(now())
+  quoteId   Int      @unique
+  userId    Int
+  claims    Claim[]
+  client    Client   @relation(fields: [clientId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+  quote     Quote    @relation(fields: [quoteId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Client {
-  id      Int    @id @default(autoincrement())
-  name    String
-  phone   String
-  email   String
-  address String
-  userId  Int // the agent/subagent who created them
-
+  id       Int      @id @default(autoincrement())
+  name     String
+  email    String
+  phone    String
+  address  String
+  userId   Int
+  claims   Claim[]
   user     User     @relation(fields: [userId], references: [id])
   policies Policy[]
-  claims   Claim[]
 }
 
 model Claim {
   id        Int      @id @default(autoincrement())
   policyId  Int
-  clientId  Int
-  amount    Int
   status    String
-  reason    String
+  amount    Int
+  clientId  Int
   createdAt DateTime @default(now())
-
-  policy Policy @relation(fields: [policyId], references: [id])
-  client Client @relation(fields: [clientId], references: [id])
+  reason    String
+  client    Client   @relation(fields: [clientId], references: [id])
+  policy    Policy   @relation(fields: [policyId], references: [id])
 }
