@@ -38,10 +38,11 @@ router.post('/', async (req, res) => {
     vehicleClass,
     coverage,
     basePremium,
-    make,
-    agentcode,
+    make,           // ✅ destructured
+    agentcode       // ✅ destructured
   } = req.body;
 
+  // ✅ Validate presence of required fields
   if (!name || typeof basePremium !== 'number' || !agentcode) {
     return res.status(400).json({
       error: 'Missing required fields: name, basePremium (number), and agentcode.',
@@ -57,8 +58,8 @@ router.post('/', async (req, res) => {
         vehicleClass,
         coverage,
         basePremium,
-        make,
-        agentcode,
+        make,       // ✅ use the variable declared above
+        agentcode   // ✅ use the variable declared above
       },
     });
     res.status(201).json(product);
@@ -67,6 +68,7 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: 'Failed to create product.', detail: error.message });
   }
 });
+
 
 // UPDATE product
 router.put('/:id', async (req, res) => {
