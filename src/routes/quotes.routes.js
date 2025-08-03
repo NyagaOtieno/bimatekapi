@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const prisma = require('../../lib/prisma');
+const { Quote, Product } = require('../../models'); // Make sure these are correct paths
 
 // Utility to calculate premium
 const calculatePremium = (basePremium, value, yearOfManufacture, period) => {
@@ -23,73 +23,85 @@ router.post('/', async (req, res) => {
     value,
     make,
     yearOfManufacture,
-    userId,
+    agent_code,
+    name_contact,
+    email,
+    phone_number
   } = req.body;
+
+  const parsedAgentCode = parseInt(agent_code);
+  const parsedYOM = parseInt(yearOfManufacture);
+  const parsedValue = parseFloat(value);
+  const parsedPeriod = parseInt(period);
 
   // Validate required fields
   const requiredFields = {
     vehicleClass,
     coverage,
-    period,
-    value,
+    period: parsedPeriod,
+    value: parsedValue,
     make,
-    yearOfManufacture,
-    userId,
+    yearOfManufacture: parsedYOM,
+    agent_code: parsedAgentCode,
+    name_contact,
+    email,
+    phone_number
   };
 
   const missingFields = Object.entries(requiredFields)
-    .filter(([_, val]) => val === undefined || val === null || val === '')
+    .filter(([_, val]) => !val && val !== 0)
     .map(([key]) => key);
 
   if (missingFields.length > 0) {
     return res.status(400).json({
-      error: `Missing required fields: ${missingFields.join(', ')}`,
+      error: `Missing or invalid required fields: ${missingFields.join(', ')}`
     });
   }
 
   try {
-    // Find a matching product
-    const product = await prisma.product.findFirst({
+    // Match product
+    const product = await Product.findOne({
       where: {
         vehicleClass,
         coverage,
         make,
-      },
+        agentcode: parsedAgentCode.toString()
+      }
     });
 
     if (!product) {
-      return res.status(404).json({ error: 'No matching insurance product found.' });
+      return res.status(404).json({
+        error: 'No matching insurance product found for this agent.'
+      });
     }
 
-    // Calculate premium
     const premium = calculatePremium(
       product.basePremium,
-      value,
-      yearOfManufacture,
-      period
+      parsedValue,
+      parsedYOM,
+      parsedPeriod
     );
 
-    // Create the quote
-    const quote = await prisma.quote.create({
-      data: {
-        productId: product.id,
-        userId,
-        price: premium,
-        value,
-        period,
-        make,
-        yearOfManufacture,
-      },
-      include: {
-        product: true,
-        user: true,
-      },
+    const quote = await Quote.create({
+      productId: product.id,
+      value: parsedValue,
+      period: parsedPeriod,
+      make,
+      yearOfManufacture: parsedYOM,
+      agent_code: parsedAgentCode,
+      name_contact,
+      email,
+      phone_number,
+      price: premium
     });
 
-    return res.status(201).json(quote);
+    res.status(201).json({ message: 'Quote created successfully', quote });
   } catch (error) {
     console.error('❌ Error creating quote:', error);
-    return res.status(500).json({ error: 'Internal server error while creating quote.' });
+    res.status(500).json({
+      error: 'Internal server error while creating quote.',
+      detail: error.message
+    });
   }
 });
 

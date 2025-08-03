@@ -1,111 +1,83 @@
-const express = require('express');
-const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-
-// GET all products
-router.get('/', async (req, res) => {
-  try {
-    const products = await prisma.product.findMany();
-    res.json(products);
-  } catch (error) {
-    console.error('❌ Error fetching products:', error);
-    res.status(500).json({ error: 'Failed to fetch products.', detail: error.message });
-  }
-});
-
-// GET product by ID
-router.get('/:id', async (req, res) => {
-  const id = parseInt(req.params.id);
-  if (isNaN(id)) return res.status(400).json({ error: 'Invalid product ID.' });
-
-  try {
-    const product = await prisma.product.findUnique({ where: { id } });
-    if (!product) return res.status(404).json({ message: 'Product not found' });
-    res.json(product);
-  } catch (error) {
-    console.error('❌ Error fetching product by ID:', error);
-    res.status(500).json({ error: 'Failed to fetch product.', detail: error.message });
-  }
-});
-
-// CREATE new product
 router.post('/', async (req, res) => {
   const {
     name,
     description,
+    basePremium,
     underwriter,
     vehicleClass,
     coverage,
-    basePremium,
+    period,
+    value,
     make,
+    yearOfManufacture,
+    tonnage,
+    passengers,
     agentcode
   } = req.body;
 
-  if (
-    !name ||
-    typeof basePremium !== 'number' ||
-    (typeof agentcode !== 'string' && typeof agentcode !== 'number')
-  ) {
-    return res.status(400).json({
-      error: 'Missing required fields: name, basePremium (number), and agentcode.'
-    });
+  const requiredFields = {
+    name,
+    description,
+    basePremium,
+    underwriter,
+    vehicleClass,
+    coverage,
+    period,
+    value,
+    make,
+    yearOfManufacture,
+    agentcode
+  };
+
+  const missingFields = Object.entries(requiredFields)
+    .filter(([_, v]) => v === undefined || v === null || v === '')
+    .map(([k]) => k);
+
+  if (missingFields.length > 0) {
+    return res.status(400).json({ error: `Missing required fields: ${missingFields.join(', ')}` });
   }
 
   try {
-    const product = await prisma.product.create({
-      data: {
+    const product = await prisma.product.upsert({
+      where: {
+        vehicleClass_coverage_make_yearOfManufacture_period_agentcode: {
+          vehicleClass,
+          coverage,
+          make,
+          yearOfManufacture,
+          period,
+          agentcode
+        }
+      },
+      update: {
         name,
         description,
+        basePremium,
+        underwriter,
+        value,
+        tonnage: tonnage ? parseInt(tonnage) : null,
+        passengers: passengers ? parseInt(passengers) : null
+      },
+      create: {
+        name,
+        description,
+        basePremium,
         underwriter,
         vehicleClass,
         coverage,
-        basePremium,
+        period,
+        value,
         make,
-        agentcode: agentcode.toString() // if agentcode is stored as String in schema
+        yearOfManufacture,
+        tonnage: tonnage ? parseInt(tonnage) : null,
+        passengers: passengers ? parseInt(passengers) : null,
+        agentcode
       }
     });
 
     res.status(201).json(product);
   } catch (error) {
-    console.error('❌ Error creating product:', error);
-    res.status(500).json({
-      error: 'Failed to create product.',
-      detail: error.message
-    });
+    console.error('❌ Error creating/updating product:', error);
+    res.status(500).json({ error: 'Internal server error', detail: error.message });
   }
 });
-
-
-// UPDATE product
-router.put('/:id', async (req, res) => {
-  const id = parseInt(req.params.id);
-  if (isNaN(id)) return res.status(400).json({ error: 'Invalid product ID.' });
-
-  try {
-    const updated = await prisma.product.update({
-      where: { id },
-      data: req.body,
-    });
-    res.json(updated);
-  } catch (error) {
-    console.error('❌ Error updating product:', error);
-    res.status(500).json({ error: 'Failed to update product.', detail: error.message });
-  }
-});
-
-// DELETE product
-router.delete('/:id', async (req, res) => {
-  const id = parseInt(req.params.id);
-  if (isNaN(id)) return res.status(400).json({ error: 'Invalid product ID.' });
-
-  try {
-    await prisma.product.delete({ where: { id } });
-    res.status(204).send();
-  } catch (error) {
-    console.error('❌ Error deleting product:', error);
-    res.status(500).json({ error: 'Failed to delete product.', detail: error.message });
-  }
-});
-
-module.exports = router;
