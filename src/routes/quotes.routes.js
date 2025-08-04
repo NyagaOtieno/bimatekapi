@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { Quote, Product } = require('../../models'); // Sequelize models
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
-// 🔁 Map vehicle class ID to string enum
+// 🔁 Vehicle class mapping
 const vehicleClassMap = {
   "1": "MOTORCYCLE_PRIVATE",
   "2": "MOTORCYCLE_PSV",
@@ -28,7 +29,7 @@ const vehicleClassMap = {
   "22": "PRIME_MOVER"
 };
 
-// 💡 Premium calculator
+// 🧠 Premium formula
 const calculatePremium = (basePremium, value, yearOfManufacture, period) => {
   const currentYear = new Date().getFullYear();
   const age = currentYear - yearOfManufacture;
@@ -41,7 +42,7 @@ const calculatePremium = (basePremium, value, yearOfManufacture, period) => {
 // 🚀 POST /api/quotes
 router.post('/', async (req, res) => {
   const {
-    vehicleClass, // as ID
+    vehicleClass, // as ID string
     coverage,
     period,
     value,
@@ -58,15 +59,15 @@ router.post('/', async (req, res) => {
     vehicle_reg
   } = req.body;
 
-  // Convert & validate
-  const parsedAgentCode = parseInt(agent_code);
-  const parsedYOM = parseInt(yearOfManufacture);
-  const parsedValue = parseFloat(value);
-  const parsedPeriod = parseInt(period);
+  // Parse and convert values
   const vehicleClassEnum = vehicleClassMap[vehicleClass];
+  const parsedPeriod = parseInt(period);
+  const parsedValue = parseFloat(value);
+  const parsedYOM = parseInt(yearOfManufacture);
+  const parsedAgentCode = agent_code?.toString();
 
   const requiredFields = {
-    vehicleClass,
+    vehicleClass: vehicleClassEnum,
     coverage,
     period: parsedPeriod,
     value: parsedValue,
@@ -81,31 +82,33 @@ router.post('/', async (req, res) => {
   };
 
   const missingFields = Object.entries(requiredFields)
-    .filter(([_, val]) => val === undefined || val === null || val === '')
-    .map(([key]) => key);
+    .filter(([_, v]) => v === undefined || v === null || v === '')
+    .map(([k]) => k);
 
   if (!vehicleClassEnum) missingFields.push('vehicleClass (invalid ID)');
 
   if (missingFields.length > 0) {
     return res.status(400).json({
-      error: `Missing or invalid required fields: ${missingFields.join(', ')}`
+      error: `Missing or invalid fields: ${missingFields.join(', ')}`
     });
   }
 
   try {
-    // 🔍 Find product match
-    const product = await Product.findOne({
+    // 🔍 Look up product
+    const product = await prisma.product.findFirst({
       where: {
         vehicleClass: vehicleClassEnum,
         coverage,
         make,
-        agentcode: parsedAgentCode.toString()
+        agentcode: parsedAgentCode,
+        yearOfManufacture: parsedYOM,
+        period: parsedPeriod
       }
     });
 
     if (!product) {
       return res.status(404).json({
-        error: 'No matching insurance product found for this agent and vehicle class.'
+        error: 'No matching product found for the given agent and vehicle attributes.'
       });
     }
 
@@ -116,30 +119,32 @@ router.post('/', async (req, res) => {
       parsedPeriod
     );
 
-    // 📝 Create quote
-    const quote = await Quote.create({
-      productId: product.id,
-      value: parsedValue,
-      period: parsedPeriod,
-      make,
-      yearOfManufacture: parsedYOM,
-      agent_code: parsedAgentCode,
-      name_contact,
-      email,
-      phone_number,
-      price: premium,
-      tonnage,
-      passengers,
-      cover,
-      coverperiod,
-      vehicle_reg
+    // 📝 Save quote
+    const quote = await prisma.quote.create({
+      data: {
+        productId: product.id,
+        value: parsedValue,
+        period: parsedPeriod,
+        make,
+        yearOfManufacture: parsedYOM,
+        agent_code: parsedAgentCode,
+        name_contact,
+        email,
+        phone_number,
+        price: premium,
+        tonnage: tonnage ? parseInt(tonnage) : null,
+        passengers: passengers ? parseInt(passengers) : null,
+        cover,
+        coverperiod,
+        vehicle_reg
+      }
     });
 
-    res.status(201).json({ message: 'Quote created successfully', quote });
+    return res.status(201).json({ message: 'Quote created successfully', quote });
   } catch (error) {
     console.error('❌ Error creating quote:', error);
     res.status(500).json({
-      error: 'Internal server error while creating quote.',
+      error: 'Server error while creating quote.',
       detail: error.message
     });
   }
