@@ -1,4 +1,3 @@
-// File: prisma/seed.js
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
@@ -30,11 +29,9 @@ async function main() {
   // ✅ Comprehensive product
   const compProduct = await prisma.product.upsert({
     where: {
-      vehicleClass_coverage_make_yearOfManufacture_period_agentcode: {
+      vehicleClass_coverage_period_agentcode: {
         vehicleClass: 'MOTORCYCLE_PRIVATE',
-        coverage: 'Comprehensive',
-        make: 'Boxer',
-        yearOfManufacture: 2022,
+        coverage: 'COMPREHENSIVE',
         period: '12',
         agentcode: '31212',
       },
@@ -46,71 +43,103 @@ async function main() {
       basePremium: 0.03,
       underwriter: 'Xtra Insurance Co.',
       vehicleClass: 'MOTORCYCLE_PRIVATE',
-      coverage: 'Comprehensive',
+      coverage: 'COMPREHENSIVE',
       period: '12',
-      value: 120000,
-      make: 'Boxer',
-      yearOfManufacture: 2022,
+      ExcludedMakes: 'TOYOTA PROBOX',
       tonnage: 0,
       passengers: 1,
       agentcode: '31212',
-      minAge: 0,
+      minAge: 5,
       maxAge: 10,
       minValue: 50000,
       maxValue: 300000,
     },
   });
 
-  // ✅ TPO product (handle null make/yearOfManufacture manually)
-let tpoProduct = await prisma.product.findFirst({
-  where: {
-    vehicleClass: 'PSV_MATATU',
-    coverage: 'TPO',
-    make: null,
-    yearOfManufacture: null,
-    period: '1',
-    agentcode: '31212',
-  },
-});
-
-if (tpoProduct) {
-  tpoProduct = await prisma.product.update({
-    where: { id: tpoProduct.id },
-    data: {
-      premium_week: 700,
-      premium_2weeks: 1300,
-      premium_month: 2500,
-      premium_3months: 7000,
-      premium_6months: 13000,
-      premium_annual: 24000,
+  // ✅ TPO for commercial vehicles (tonnage-based)
+  const tpoCommercialConfigs = [
+    {
+      vehicleClass: 'MOTORVEHICLE_OWN_GOODS',
+      minTonnage: 0,
+      maxTonnage: 3,
     },
-  });
-} else {
-  tpoProduct = await prisma.product.create({
-    data: {
-      name: 'Matatu TPO Cover',
-      description: 'TPO for PSV Matatu with multiple period rates.',
-      underwriter: 'Xtra Insurance Co.',
+    {
+      vehicleClass: 'MOTORVEHICLE_GENERAL_CARTAGE',
+      minTonnage: 3,
+      maxTonnage: 8,
+    },
+  ];
+
+  for (const config of tpoCommercialConfigs) {
+    await prisma.product.create({
+      data: {
+        name: `${config.vehicleClass} TPO`,
+        description: `TPO for ${config.vehicleClass} ${config.minTonnage}-${config.maxTonnage} tons.`,
+        underwriter: 'Xtra Insurance Co.',
+        vehicleClass: config.vehicleClass,
+        coverage: 'TPO',
+        period: '1',
+        agentcode: '31212',
+        minValue: 50000,
+        maxValue: 800000,
+        minAge: 1,
+        maxAge: 20,
+        tonnage: config.maxTonnage,
+        basePremium: 0,
+        premium_week: 2000,
+        premium_2weeks: 4000,
+        premium_month: 8000,
+        premium_3months: 15000,
+        premium_6months: 28000,
+        premium_annual: 50000,
+      },
+    });
+  }
+
+  // ✅ TPO for PSV based on passengers
+  const tpoPsvConfigs = [
+    {
       vehicleClass: 'PSV_MATATU',
-      coverage: 'TPO',
-      period: '1',
-      make: null,
-      yearOfManufacture: null,
-      agentcode: '31212',
-      premium_week: 700,
-      premium_2weeks: 1300,
-      premium_month: 2500,
-      premium_3months: 7000,
-      premium_6months: 13000,
-      premium_annual: 24000,
       passengers: 14,
-      basePremium: 0,
     },
-  });
-}
+    {
+      vehicleClass: 'PSV_TAXI',
+      passengers: 4,
+    },
+  ];
 
+  for (const config of tpoPsvConfigs) {
+    await prisma.product.upsert({
+      where: {
+        vehicleClass_coverage_period_agentcode: {
+          vehicleClass: config.vehicleClass,
+          coverage: 'TPO',
+          period: '1',
+          agentcode: '31212',
+        },
+      },
+      update: {},
+      create: {
+        name: `${config.vehicleClass} TPO`,
+        description: `TPO for ${config.passengers}-seater ${config.vehicleClass}.`,
+        underwriter: 'Xtra Insurance Co.',
+        vehicleClass: config.vehicleClass,
+        coverage: 'TPO',
+        period: '1',
+        agentcode: '31212',
+        passengers: config.passengers,
+        basePremium: 0,
+        premium_week: 1500,
+        premium_2weeks: 3000,
+        premium_month: 6000,
+        premium_3months: 11000,
+        premium_6months: 20000,
+        premium_annual: 36000,
+      },
+    });
+  }
 
-  // ✅ Create quote for comprehensive product
+  // ✅ Quote from comprehensive product
   const quote = await prisma.quote.create({
     data: {
       productId: compProduct.id,
@@ -125,13 +154,13 @@ if (tpoProduct) {
       email: 'jane@example.com',
       phone_number: '0700123456',
       vehicle_reg: 'KDA123A',
-      cover: 'Comprehensive',
+      cover: 'COMPREHENSIVE',
       tonnage: 0,
       passengers: 1,
     },
   });
 
-  // ✅ Create policy from quote
+  // ✅ Policy from quote
   const policy = await prisma.policy.create({
     data: {
       quoteId: quote.id,
@@ -141,17 +170,16 @@ if (tpoProduct) {
     },
   });
 
-  // ✅ Create claim for the policy
+  // ✅ Claim for policy
   await prisma.claim.create({
-  data: {
-    policyId: policy.id,
-    reason: "Accident repair",
-    amount: 800,
-    clientId: client.id,
-    status: "Pending", //  Add a real string value
-  },
-});
-
+    data: {
+      policyId: policy.id,
+      reason: 'Accident repair',
+      amount: 800,
+      clientId: client.id,
+      status: 'Pending',
+    },
+  });
 
   console.log('🌱 Seed data created successfully');
 }

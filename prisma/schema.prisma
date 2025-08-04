@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum VehicleClassId {
+enum VehicleClass {
   MOTORCYCLE_PRIVATE
   MOTORCYCLE_PSV
   MOTORCYCLE_COMMERCIAL
@@ -32,6 +32,11 @@ enum VehicleClassId {
   PRIME_MOVER
 }
 
+enum CoverageType {
+  TPO
+  COMPREHENSIVE
+}
+
 model User {
   id       Int    @id @default(autoincrement())
   name     String
@@ -44,25 +49,28 @@ model User {
 }
 
 model Product {
-  id                Int            @id @default(autoincrement())
-  name              String
-  description       String
-  basePremium       Float
-  underwriter       String
-  vehicleClass      VehicleClassId
-  coverage          String
-  period            String? // Optional for TPO
-  ExcludedMakes     String? // Optional; only for Comprehensive
-  passengers        Int?
-  agentcode         String
+  id              Int           @id @default(autoincrement())
+  name            String
+  description     String
+  basePremium     Float
+  underwriter     String
+  vehicleClass    VehicleClass
+  coverage        CoverageType
+  period          String?      // Optional for TPO
+  ExcludedMakes   String?      // Optional; for Comprehensive filters
+  passengers      Int?         // For PSV
+  tonnage         Int?         // For commercial
+  minTonnage      Int?         // Tonnage lower limit
+  maxTonnage      Int?         // Tonnage upper limit
+  agentcode       String
 
   // ✅ Vehicle age restrictions
-  minAge Int?
-  maxAge Int?
+  minAge          Int?
+  maxAge          Int?
 
   // ✅ Vehicle value restrictions
-  minValue Float?
-  maxValue Float?
+  minValue        Float?
+  maxValue        Float?
 
   // ✅ TPO-specific premiums
   premium_week    Float?
@@ -72,13 +80,12 @@ model Product {
   premium_6months Float?
   premium_annual  Float?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  quotes   Quote[]
-  policies Policy[]
+  quotes          Quote[]
+  policies        Policy[]
 
-  // ✅ Modified unique constraint (excluding make + yearOfManufacture)
   @@unique([vehicleClass, coverage, period, agentcode])
 }
 
@@ -86,27 +93,27 @@ model Quote {
   id                Int     @id @default(autoincrement())
   productId         Int
   userId            Int?
-  price             Float // Calculated and stored
-  value             Float? // Optional for TPO
-  period            String // e.g. "1 month"
-  make              String? // Optional for TPO
-  yearOfManufacture Int? // Optional for TPO
+  price             Float
+  value             Float?
+  period            String
+  make              String?
+  yearOfManufacture Int?
   agent_code        String
 
-  name_contact String
-  email        String
-  phone_number String
+  name_contact      String
+  email             String
+  phone_number      String
 
-  vehicle_reg String?
-  cover       String // "TPO" or "Comprehensive"
-  tonnage     Int?
-  passengers  Int?
+  vehicle_reg       String?
+  cover             String
+  tonnage           Int?
+  passengers        Int?
 
-  createdAt DateTime @default(now())
+  createdAt         DateTime @default(now())
 
-  product Product @relation(fields: [productId], references: [id])
-  user    User?   @relation(fields: [userId], references: [id])
-  policy  Policy? @relation("QuoteToPolicy")
+  product           Product  @relation(fields: [productId], references: [id])
+  user              User?    @relation(fields: [userId], references: [id])
+  policy            Policy?  @relation("QuoteToPolicy")
 }
 
 model Policy {
@@ -116,11 +123,11 @@ model Policy {
   userId    Int
   clientId  Int?
 
-  quote   Quote   @relation("QuoteToPolicy", fields: [quoteId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
-  user    User    @relation(fields: [userId], references: [id])
-  Client  Client? @relation(fields: [clientId], references: [id])
-  claims  Claim[]
+  quote     Quote   @relation("QuoteToPolicy", fields: [quoteId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+  user      User    @relation(fields: [userId], references: [id])
+  Client    Client? @relation(fields: [clientId], references: [id])
+  claims    Claim[]
 }
 
 model Client {
@@ -144,6 +151,6 @@ model Claim {
   createdAt DateTime @default(now())
   reason    String
 
-  client Client @relation(fields: [clientId], references: [id])
-  policy Policy @relation(fields: [policyId], references: [id])
+  client    Client @relation(fields: [clientId], references: [id])
+  policy    Policy @relation(fields: [policyId], references: [id])
 }

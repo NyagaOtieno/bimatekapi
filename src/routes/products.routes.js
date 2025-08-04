@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+
 router.post('/', async (req, res) => {
   const {
     name,
@@ -11,9 +12,6 @@ router.post('/', async (req, res) => {
     vehicleClass,
     coverage,
     period,
-    value,
-    make,
-    yearOfManufacture,
     tonnage,
     passengers,
     agentcode,
@@ -21,10 +19,17 @@ router.post('/', async (req, res) => {
     maxAge,
     minValue,
     maxValue,
-    confirmUpdate // ✅ for user confirmation
+    premium_week,
+    premium_2weeks,
+    premium_month,
+    premium_3months,
+    premium_6months,
+    premium_annual,
+    ExcludedMakes,
+    confirmUpdate // ✅ user confirmation to update existing product
   } = req.body;
 
-  // ✅ Basic validation
+  // ✅ Required fields check (adjusted)
   const requiredFields = {
     name,
     description,
@@ -33,9 +38,6 @@ router.post('/', async (req, res) => {
     vehicleClass,
     coverage,
     period,
-    value,
-    make,
-    yearOfManufacture,
     agentcode
   };
 
@@ -50,26 +52,16 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    // 🔍 Check for existing matching product by same agent + underwriter
+    // 🔍 Look for a product with same vehicleClass, coverage, period, agentcode, and underwriter
     const existingProduct = await prisma.product.findFirst({
       where: {
         vehicleClass,
         coverage,
         period,
-        make,
-        yearOfManufacture,
         agentcode,
-        underwriter,
+        underwriter
       }
     });
-
-    if (existingProduct && !confirmUpdate) {
-      return res.status(409).json({
-        warning: 'A similar product already exists for this agent and underwriter.',
-        existingProduct,
-        message: 'Set "confirmUpdate": true in the payload to update this product.'
-      });
-    }
 
     const data = {
       name,
@@ -79,40 +71,54 @@ router.post('/', async (req, res) => {
       vehicleClass,
       coverage,
       period,
-      value: parseFloat(value),
-      make,
-      yearOfManufacture: parseInt(yearOfManufacture),
       tonnage: tonnage ? parseInt(tonnage) : null,
       passengers: passengers ? parseInt(passengers) : null,
       agentcode,
       minAge: minAge ? parseInt(minAge) : null,
       maxAge: maxAge ? parseInt(maxAge) : null,
       minValue: minValue ? parseFloat(minValue) : null,
-      maxValue: maxValue ? parseFloat(maxValue) : null
+      maxValue: maxValue ? parseFloat(maxValue) : null,
+      premium_week: premium_week ? parseFloat(premium_week) : null,
+      premium_2weeks: premium_2weeks ? parseFloat(premium_2weeks) : null,
+      premium_month: premium_month ? parseFloat(premium_month) : null,
+      premium_3months: premium_3months ? parseFloat(premium_3months) : null,
+      premium_6months: premium_6months ? parseFloat(premium_6months) : null,
+      premium_annual: premium_annual ? parseFloat(premium_annual) : null,
+      ExcludedMakes
     };
 
     let product;
+
     if (existingProduct && confirmUpdate) {
       product = await prisma.product.update({
         where: { id: existingProduct.id },
         data
       });
       return res.status(200).json({
-        message: 'Product updated successfully.',
-        product
-      });
-    } else {
-      product = await prisma.product.create({ data });
-      return res.status(201).json({
-        message: 'Product created successfully.',
+        message: '✅ Product updated successfully.',
         product
       });
     }
+
+    if (existingProduct && !confirmUpdate) {
+      return res.status(409).json({
+        warning: 'A similar product already exists for this agent and underwriter.',
+        existingProduct,
+        message: 'Include "confirmUpdate": true in the request body to overwrite it.'
+      });
+    }
+
+    product = await prisma.product.create({ data });
+
+    return res.status(201).json({
+      message: '✅ Product created successfully.',
+      product
+    });
   } catch (error) {
     console.error('❌ Error in product POST:', error);
     return res.status(500).json({
       error: 'Internal server error',
-      detail: error.message,
+      detail: error.message
     });
   }
 });
