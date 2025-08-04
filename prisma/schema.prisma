@@ -52,19 +52,24 @@ model Product {
   underwriter       String
   vehicleClass      VehicleClassId
   coverage          String
-  period            String // e.g., "1 year"
-  value             Float // e.g., 1500000
-  make              String
-  yearOfManufacture Int
-  tonnage           Int?
-  passengers        Int?
+  period            String?        // ✅ made optional
+  value             Float?         // ✅ made optional
+  make              String?
+  yearOfManufacture Int?           // ✅ made optional
+  tonnage           Int?           // already optional
+  passengers        Int?           // already optional
   agentcode         String
 
-  quotes   Quote[]
-  policies Policy[]
+  createdAt         DateTime     @default(now()) // ✅ optional
+  updatedAt         DateTime      @updatedAt      // ✅ optional
+
+  quotes            Quote[]
+  policies          Policy[]
 
   @@unique([vehicleClass, coverage, make, yearOfManufacture, period, agentcode])
 }
+
+
 
 model Quote {
   id                Int     @id @default(autoincrement())
@@ -111,16 +116,14 @@ model Policy {
 }
 
 model Client {
-  id      Int    @id @default(autoincrement())
+  id      Int     @id @default(autoincrement())
   name    String
-  email   String
+  email   String  @unique // ✅ Make this unique
   phone   String
   address String
   userId  Int
-
-  // Relations
-  claims   Claim[]
-  user     User     @relation(fields: [userId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+  claims  Claim[]
   policies Policy[] // Already defined; matches Policy relation
 }
 

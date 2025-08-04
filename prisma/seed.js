@@ -3,18 +3,22 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  // Create an admin user
-  const user = await prisma.user.create({
-    data: {
+  // ✅ Upsert admin user
+  const user = await prisma.user.upsert({
+    where: { email: 'admin@bimatek.com' },
+    update: {}, // you can add fields to update if needed
+    create: {
       name: 'Admin User',
       email: 'admin@bimatek.com',
-      password: 'hashed_password_here', // Replace with real hash if needed
+      password: 'hashed_password_here', // replace with hashed password
     },
   });
 
-  // Create a client
-  const client = await prisma.client.create({
-    data: {
+  // ✅ Upsert client
+  const client = await prisma.client.upsert({
+    where: { email: 'jane@example.com' },
+    update: {},
+    create: {
       name: 'Jane Doe',
       email: 'jane@example.com',
       phone: '0700123456',
@@ -23,7 +27,7 @@ async function main() {
     },
   });
 
-  // Create a product with full parameters
+  // ✅ Create product
   const product = await prisma.product.create({
     data: {
       name: 'BodaBoda Insurance',
@@ -38,11 +42,11 @@ async function main() {
       yearOfManufacture: 2022,
       tonnage: 0,
       passengers: 1,
-      agentcode: 'BODA123',
+      agentcode: '31212',
     },
   });
 
-  // Create a quote linked to product and user
+  // ✅ Create quote
   const quote = await prisma.quote.create({
     data: {
       productId: product.id,
@@ -52,7 +56,7 @@ async function main() {
       period: 12,
       make: 'Boxer',
       yearOfManufacture: 2022,
-      agent_code: 123456,
+      agentcode: '31212',
       name_contact: 'Jane Doe',
       email: 'jane@example.com',
       phone_number: '0700123456',
@@ -64,7 +68,7 @@ async function main() {
     },
   });
 
-  // Create a policy
+  // ✅ Create policy
   const policy = await prisma.policy.create({
     data: {
       quoteId: quote.id,
@@ -73,7 +77,7 @@ async function main() {
     },
   });
 
-  // Create a claim
+  // ✅ Create claim
   await prisma.claim.create({
     data: {
       policyId: policy.id,
