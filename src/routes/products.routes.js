@@ -11,10 +11,14 @@ router.get('/', async (req, res) => {
     });
     res.status(200).json(products);
   } catch (error) {
-    console.error('❌ Error fetching products:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching products in GET /api/products:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      detail: error.message
+    });
   }
 });
+
 
 // 🚀 POST or UPSERT product
 router.post('/', async (req, res) => {
