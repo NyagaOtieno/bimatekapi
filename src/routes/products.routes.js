@@ -1,3 +1,8 @@
+const express = require('express');
+const router = express.Router();
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
 router.post('/', async (req, res) => {
   const {
     name,
@@ -12,9 +17,10 @@ router.post('/', async (req, res) => {
     yearOfManufacture,
     tonnage,
     passengers,
-    agentcode
+    agentcode,
   } = req.body;
 
+  // ✅ Validate required fields
   const requiredFields = {
     name,
     description,
@@ -26,7 +32,7 @@ router.post('/', async (req, res) => {
     value,
     make,
     yearOfManufacture,
-    agentcode
+    agentcode,
   };
 
   const missingFields = Object.entries(requiredFields)
@@ -34,7 +40,9 @@ router.post('/', async (req, res) => {
     .map(([k]) => k);
 
   if (missingFields.length > 0) {
-    return res.status(400).json({ error: `Missing required fields: ${missingFields.join(', ')}` });
+    return res.status(400).json({
+      error: `Missing required fields: ${missingFields.join(', ')}`,
+    });
   }
 
   try {
@@ -46,38 +54,43 @@ router.post('/', async (req, res) => {
           make,
           yearOfManufacture,
           period,
-          agentcode
-        }
+          agentcode,
+        },
       },
       update: {
         name,
         description,
-        basePremium,
+        basePremium: parseFloat(basePremium),
         underwriter,
-        value,
+        value: parseFloat(value),
         tonnage: tonnage ? parseInt(tonnage) : null,
-        passengers: passengers ? parseInt(passengers) : null
+        passengers: passengers ? parseInt(passengers) : null,
       },
       create: {
         name,
         description,
-        basePremium,
+        basePremium: parseFloat(basePremium),
         underwriter,
         vehicleClass,
         coverage,
         period,
-        value,
+        value: parseFloat(value),
         make,
         yearOfManufacture,
         tonnage: tonnage ? parseInt(tonnage) : null,
         passengers: passengers ? parseInt(passengers) : null,
-        agentcode
-      }
+        agentcode,
+      },
     });
 
-    res.status(201).json(product);
+    return res.status(201).json(product);
   } catch (error) {
-    console.error('❌ Error creating/updating product:', error);
-    res.status(500).json({ error: 'Internal server error', detail: error.message });
+    console.error('❌ Error in product POST:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      detail: error.message,
+    });
   }
 });
+
+module.exports = router;
