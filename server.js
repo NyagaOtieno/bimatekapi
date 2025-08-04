@@ -8,12 +8,12 @@ app.use(cors());
 app.use(express.json());
 
 // Route imports
-app.use('/api/products', require('./routes/products.routes'));
-app.use('/api/users', require('./routes/users.routes'));
-app.use('/api/quotes', require('./routes/quotes.routes'));
-app.use('/api/policies', require('./routes/policies.routes'));
-app.use('/api/claims', require('./routes/claims.routes'));
-app.use('/api/clients', require('./routes/clients.routes'));
+app.use('/api/products', require('./src/routes/products.routes'));
+app.use('/api/users', require('./src/routes/users.routes'));
+app.use('/api/quotes', require('./src/routes/quotes.routes'));
+app.use('/api/policies', require('./src/routes/policies.routes'));
+app.use('/api/claims', require('./src/routes/claims.routes'));
+app.use('/api/clients', require('./src/routes/clients.routes'));
 
 // 👇 Add this to show status at "/"
 app.get('/', (req, res) => {

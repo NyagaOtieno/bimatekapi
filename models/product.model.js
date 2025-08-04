@@ -6,20 +6,27 @@ module.exports = (sequelize) => {
     description: { type: DataTypes.STRING },
     basePremium: { type: DataTypes.FLOAT, allowNull: false },
     underwriter: { type: DataTypes.STRING, allowNull: false },
+
     vehicleClass: { type: DataTypes.STRING, allowNull: false },
     coverage: { type: DataTypes.STRING, allowNull: false },
     make: { type: DataTypes.STRING, allowNull: false },
     agentcode: { type: DataTypes.STRING, allowNull: false },
-    period: { type: DataTypes.STRING, allowNull: false }, // e.g., "1 year"
+    period: { type: DataTypes.STRING, allowNull: false },
+
     value: { type: DataTypes.FLOAT, allowNull: false },
     yearOfManufacture: { type: DataTypes.INTEGER, allowNull: false },
     tonnage: { type: DataTypes.INTEGER, allowNull: true },
-    passengers: { type: DataTypes.INTEGER, allowNull: true }
+    passengers: { type: DataTypes.INTEGER, allowNull: true },
+
+    minAge: { type: DataTypes.INTEGER, allowNull: true },
+    maxAge: { type: DataTypes.INTEGER, allowNull: true },
+    minValue: { type: DataTypes.FLOAT, allowNull: true },
+    maxValue: { type: DataTypes.FLOAT, allowNull: true }
   }, {
     indexes: [
       {
         unique: true,
-        fields: ['vehicleClass', 'coverage', 'make', 'yearOfManufacture', 'period', 'agentcode']
+        fields: ['underwriter', 'vehicleClass', 'coverage', 'period', 'agentcode']
       }
     ]
   });

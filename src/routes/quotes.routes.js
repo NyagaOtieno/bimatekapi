@@ -3,7 +3,7 @@ const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// 🔁 Vehicle class mapping
+// Vehicle class mapping
 const vehicleClassMap = {
   "1": "MOTORCYCLE_PRIVATE",
   "2": "MOTORCYCLE_PSV",
@@ -29,20 +29,27 @@ const vehicleClassMap = {
   "22": "PRIME_MOVER"
 };
 
-// 🧠 Premium formula
-const calculatePremium = (basePremium, value, yearOfManufacture, period) => {
-  const currentYear = new Date().getFullYear();
-  const age = currentYear - yearOfManufacture;
-  const ageFactor = age > 5 ? 1.1 : 1.0;
-  const valueFactor = value / 1_000_000;
-  const periodFactor = period / 12;
-  return Math.round(basePremium * valueFactor * ageFactor * periodFactor);
+// Premium calculator for comprehensive
+const calculateComprehensivePremium = (rate, value) => {
+  return Math.round(rate * value);
 };
 
-// 🚀 POST /api/quotes
+// Select TPO premium based on period
+const getTpoPremium = (product, period) => {
+  switch (period) {
+    case 1: return product.premium_week;
+    case 2: return product.premium_2weeks;
+    case 4: return product.premium_month;
+    case 3: return product.premium_3months;
+    case 6: return product.premium_6months;
+    case 12: return product.premium_annual;
+    default: return null;
+  }
+};
+
 router.post('/', async (req, res) => {
   const {
-    vehicleClass, // as ID string
+    vehicleClass,
     coverage,
     period,
     value,
@@ -59,49 +66,26 @@ router.post('/', async (req, res) => {
     vehicle_reg
   } = req.body;
 
-  // Parse and convert values
   const vehicleClassEnum = vehicleClassMap[vehicleClass];
   const parsedPeriod = parseInt(period);
   const parsedValue = parseFloat(value);
   const parsedYOM = parseInt(yearOfManufacture);
   const parsedAgentCode = agent_code?.toString();
 
-  const requiredFields = {
-    vehicleClass: vehicleClassEnum,
-    coverage,
-    period: parsedPeriod,
-    value: parsedValue,
-    make,
-    yearOfManufacture: parsedYOM,
-    agent_code: parsedAgentCode,
-    name_contact,
-    email,
-    phone_number,
-    cover,
-    coverperiod
-  };
-
-  const missingFields = Object.entries(requiredFields)
-    .filter(([_, v]) => v === undefined || v === null || v === '')
-    .map(([k]) => k);
-
-  if (!vehicleClassEnum) missingFields.push('vehicleClass (invalid ID)');
-
-  if (missingFields.length > 0) {
+  // Basic field validation
+  if (!vehicleClassEnum || !coverage || !parsedPeriod || !parsedAgentCode) {
     return res.status(400).json({
-      error: `Missing or invalid fields: ${missingFields.join(', ')}`
+      error: 'Missing required vehicleClass, coverage, period, or agent_code.'
     });
   }
 
   try {
-    // 🔍 Look up product
     const product = await prisma.product.findFirst({
       where: {
         vehicleClass: vehicleClassEnum,
         coverage,
         make,
         agentcode: parsedAgentCode,
-        yearOfManufacture: parsedYOM,
         period: parsedPeriod
       }
     });
@@ -112,21 +96,77 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const premium = calculatePremium(
-      product.basePremium,
-      parsedValue,
-      parsedYOM,
-      parsedPeriod
-    );
+    let premium;
 
-    // 📝 Save quote
+    if (coverage.toLowerCase() === 'comprehensive') {
+      if (!parsedValue || !parsedYOM) {
+        return res.status(400).json({
+          error: 'Comprehensive cover requires value and yearOfManufacture.'
+        });
+      }
+
+      const currentYear = new Date().getFullYear();
+      const vehicleAge = currentYear - parsedYOM;
+
+      if (product.minAge && vehicleAge < product.minAge) {
+        return res.status(400).json({
+          error: 'Vehicle is too new for this cover.',
+          vehicleAge,
+          minAllowedAge: product.minAge
+        });
+      }
+
+      if (product.maxAge && vehicleAge > product.maxAge) {
+        return res.status(400).json({
+          error: 'Vehicle exceeds maximum age limit.',
+          vehicleAge,
+          maxAllowedAge: product.maxAge
+        });
+      }
+
+      if (product.minValue && parsedValue < product.minValue) {
+        return res.status(400).json({
+          error: 'Vehicle value below minimum allowed.',
+          submittedValue: parsedValue,
+          minAllowed: product.minValue
+        });
+      }
+
+      if (product.maxValue && parsedValue > product.maxValue) {
+        return res.status(400).json({
+          error: 'Vehicle value exceeds maximum allowed.',
+          submittedValue: parsedValue,
+          maxAllowed: product.maxValue
+        });
+      }
+
+      premium = calculateComprehensivePremium(product.basePremium, parsedValue);
+    }
+
+    else if (coverage.toLowerCase() === 'tpo') {
+      premium = getTpoPremium(product, parsedPeriod);
+      if (!premium) {
+        return res.status(400).json({
+          error: 'TPO premium not set for the selected period.',
+          availablePeriods: {
+            week: product.premium_week,
+            twoWeeks: product.premium_2weeks,
+            month: product.premium_month,
+            threeMonths: product.premium_3months,
+            sixMonths: product.premium_6months,
+            annual: product.premium_annual
+          }
+        });
+      }
+    }
+
     const quote = await prisma.quote.create({
       data: {
         productId: product.id,
-        value: parsedValue,
+        value: parsedValue || null,
         period: parsedPeriod,
-        make,
-        yearOfManufacture: parsedYOM,
+        make: make || null,
+        yearOfManufacture: parsedYOM || null,
         agent_code: parsedAgentCode,
         name_contact,
         email,
@@ -141,9 +181,10 @@ router.post('/', async (req, res) => {
     });
 
     return res.status(201).json({ message: 'Quote created successfully', quote });
+
   } catch (error) {
     console.error('❌ Error creating quote:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Server error while creating quote.',
       detail: error.message
     });

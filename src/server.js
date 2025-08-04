@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 // Import route modules
-const productsRoutes = require('./routes/products.routes');
+const productRoutes = require('./routes/products.routes');
 const usersRoutes = require('./routes/users.routes');
 const quotesRoutes = require('./routes/quotes.routes');
 const policiesRoutes = require('./routes/policies.routes');

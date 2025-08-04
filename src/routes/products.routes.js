@@ -2,25 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-
-// 🔁 GET all products
-router.get('/', async (req, res) => {
-  try {
-    const products = await prisma.product.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-    res.status(200).json(products);
-  } catch (error) {
-    console.error('Error fetching products in GET /api/products:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      detail: error.message
-    });
-  }
-});
-
-
-// 🚀 POST or UPSERT product
 router.post('/', async (req, res) => {
   const {
     name,
@@ -36,9 +17,14 @@ router.post('/', async (req, res) => {
     tonnage,
     passengers,
     agentcode,
+    minAge,
+    maxAge,
+    minValue,
+    maxValue,
+    confirmUpdate // ✅ for user confirmation
   } = req.body;
 
-  // ✅ Validate required fields
+  // ✅ Basic validation
   const requiredFields = {
     name,
     description,
@@ -50,7 +36,7 @@ router.post('/', async (req, res) => {
     value,
     make,
     yearOfManufacture,
-    agentcode,
+    agentcode
   };
 
   const missingFields = Object.entries(requiredFields)
@@ -64,44 +50,64 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const product = await prisma.product.upsert({
+    // 🔍 Check for existing matching product by same agent + underwriter
+    const existingProduct = await prisma.product.findFirst({
       where: {
-        vehicleClass_coverage_make_yearOfManufacture_period_agentcode: {
-          vehicleClass,
-          coverage,
-          make,
-          yearOfManufacture,
-          period,
-          agentcode,
-        },
-      },
-      update: {
-        name,
-        description,
-        basePremium: parseFloat(basePremium),
-        underwriter,
-        value: parseFloat(value),
-        tonnage: tonnage ? parseInt(tonnage) : null,
-        passengers: passengers ? parseInt(passengers) : null,
-      },
-      create: {
-        name,
-        description,
-        basePremium: parseFloat(basePremium),
-        underwriter,
         vehicleClass,
         coverage,
         period,
-        value: parseFloat(value),
         make,
         yearOfManufacture,
-        tonnage: tonnage ? parseInt(tonnage) : null,
-        passengers: passengers ? parseInt(passengers) : null,
         agentcode,
-      },
+        underwriter,
+      }
     });
 
-    return res.status(201).json(product);
+    if (existingProduct && !confirmUpdate) {
+      return res.status(409).json({
+        warning: 'A similar product already exists for this agent and underwriter.',
+        existingProduct,
+        message: 'Set "confirmUpdate": true in the payload to update this product.'
+      });
+    }
+
+    const data = {
+      name,
+      description,
+      basePremium: parseFloat(basePremium),
+      underwriter,
+      vehicleClass,
+      coverage,
+      period,
+      value: parseFloat(value),
+      make,
+      yearOfManufacture: parseInt(yearOfManufacture),
+      tonnage: tonnage ? parseInt(tonnage) : null,
+      passengers: passengers ? parseInt(passengers) : null,
+      agentcode,
+      minAge: minAge ? parseInt(minAge) : null,
+      maxAge: maxAge ? parseInt(maxAge) : null,
+      minValue: minValue ? parseFloat(minValue) : null,
+      maxValue: maxValue ? parseFloat(maxValue) : null
+    };
+
+    let product;
+    if (existingProduct && confirmUpdate) {
+      product = await prisma.product.update({
+        where: { id: existingProduct.id },
+        data
+      });
+      return res.status(200).json({
+        message: 'Product updated successfully.',
+        product
+      });
+    } else {
+      product = await prisma.product.create({ data });
+      return res.status(201).json({
+        message: 'Product created successfully.',
+        product
+      });
+    }
   } catch (error) {
     console.error('❌ Error in product POST:', error);
     return res.status(500).json({
