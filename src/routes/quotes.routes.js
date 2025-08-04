@@ -36,7 +36,7 @@ const calculateComprehensivePremium = (rate, value) => {
 
 // Select TPO premium based on period
 const getTpoPremium = (product, period) => {
-  switch (period) {
+  switch (parseInt(period)) {
     case 1: return product.premium_week;
     case 2: return product.premium_2weeks;
     case 4: return product.premium_month;
@@ -67,13 +67,14 @@ router.post('/', async (req, res) => {
   } = req.body;
 
   const vehicleClassEnum = vehicleClassMap[vehicleClass];
-  const parsedPeriod = parseInt(period);
-  const parsedValue = parseFloat(value);
-  const parsedYOM = parseInt(yearOfManufacture);
+  const parsedPeriod = period?.toString();
+  const parsedValue = value ? parseFloat(value) : null;
+  const parsedYOM = yearOfManufacture ? parseInt(yearOfManufacture) : null;
   const parsedAgentCode = agent_code?.toString();
+  const normalizedCoverage = coverage?.toUpperCase();
 
   // Basic field validation
-  if (!vehicleClassEnum || !coverage || !parsedPeriod || !parsedAgentCode) {
+  if (!vehicleClassEnum || !normalizedCoverage || !parsedPeriod || !parsedAgentCode) {
     return res.status(400).json({
       error: 'Missing required vehicleClass, coverage, period, or agent_code.'
     });
@@ -83,10 +84,15 @@ router.post('/', async (req, res) => {
     const product = await prisma.product.findFirst({
       where: {
         vehicleClass: vehicleClassEnum,
-        coverage,
-        make,
+        coverage: normalizedCoverage,
+        period: parsedPeriod,
         agentcode: parsedAgentCode,
-        period: parsedPeriod
+        NOT: {
+          ExcludedMakes: {
+            contains: make,
+            mode: 'insensitive'
+          }
+        }
       }
     });
 
@@ -98,7 +104,7 @@ router.post('/', async (req, res) => {
 
     let premium;
 
-    if (coverage.toLowerCase() === 'comprehensive') {
+    if (normalizedCoverage === 'COMPREHENSIVE') {
       if (!parsedValue || !parsedYOM) {
         return res.status(400).json({
           error: 'Comprehensive cover requires value and yearOfManufacture.'
@@ -143,7 +149,7 @@ router.post('/', async (req, res) => {
       premium = calculateComprehensivePremium(product.basePremium, parsedValue);
     }
 
-    else if (coverage.toLowerCase() === 'tpo') {
+    else if (normalizedCoverage === 'TPO') {
       premium = getTpoPremium(product, parsedPeriod);
       if (!premium) {
         return res.status(400).json({
@@ -163,10 +169,10 @@ router.post('/', async (req, res) => {
     const quote = await prisma.quote.create({
       data: {
         productId: product.id,
-        value: parsedValue || null,
+        value: parsedValue,
         period: parsedPeriod,
         make: make || null,
-        yearOfManufacture: parsedYOM || null,
+        yearOfManufacture: parsedYOM,
         agent_code: parsedAgentCode,
         name_contact,
         email,
@@ -174,13 +180,13 @@ router.post('/', async (req, res) => {
         price: premium,
         tonnage: tonnage ? parseInt(tonnage) : null,
         passengers: passengers ? parseInt(passengers) : null,
-        cover,
-        coverperiod,
+        cover: cover || normalizedCoverage,
+        coverperiod: coverperiod || parsedPeriod,
         vehicle_reg
       }
     });
 
-    return res.status(201).json({ message: 'Quote created successfully', quote });
+    return res.status(201).json({ message: '✅ Quote created successfully', quote });
 
   } catch (error) {
     console.error('❌ Error creating quote:', error);
