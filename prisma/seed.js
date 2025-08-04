@@ -1,66 +1,94 @@
 // File: prisma/seed.js
-const { PrismaClient } = require('../src/generated/prisma');
+const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
+  // Create an admin user
   const user = await prisma.user.create({
     data: {
       name: 'Admin User',
       email: 'admin@bimatek.com',
-      password: 'hashed_password_here',
-      role: 'admin',
+      password: 'hashed_password_here', // Replace with real hash if needed
     },
   });
 
+  // Create a client
   const client = await prisma.client.create({
     data: {
       name: 'Jane Doe',
+      email: 'jane@example.com',
       phone: '0700123456',
-      nationalId: '12345678',
+      address: '123 Test Street',
+      userId: user.id,
     },
   });
 
+  // Create a product with full parameters
   const product = await prisma.product.create({
     data: {
       name: 'BodaBoda Insurance',
       description: 'Affordable cover for boda boda operators.',
-      price: 1500,
+      basePremium: 1500,
+      underwriter: 'Xtra Insurance Co.',
+      vehicleClass: 'MOTORCYCLE_PRIVATE',
+      coverage: 'Comprehensive',
+      period: '1 year',
+      value: 120000,
+      make: 'Boxer',
+      yearOfManufacture: 2022,
+      tonnage: 0,
+      passengers: 1,
+      agentcode: 'BODA123',
     },
   });
 
+  // Create a quote linked to product and user
   const quote = await prisma.quote.create({
     data: {
       productId: product.id,
       userId: user.id,
-      premium: 1200,
-      validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      price: 1200,
+      value: 120000,
+      period: 12,
+      make: 'Boxer',
+      yearOfManufacture: 2022,
+      agent_code: 123456,
+      name_contact: 'Jane Doe',
+      email: 'jane@example.com',
+      phone_number: '0700123456',
+      vehicle_reg: 'KDA123A',
+      cover: 'Comprehensive',
+      coverperiod: '1 year',
+      tonnage: 0,
+      passengers: 1,
     },
   });
 
+  // Create a policy
   const policy = await prisma.policy.create({
     data: {
-      clientId: client.id,
+      quoteId: quote.id,
       productId: product.id,
-      startDate: new Date(),
-      endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-      premium: 1500,
+      userId: user.id,
     },
   });
 
+  // Create a claim
   await prisma.claim.create({
     data: {
       policyId: policy.id,
       reason: 'Accident repair',
-      amount: 1000,
+      amount: 800,
+      clientId: client.id,
     },
   });
 
-  console.log('🌱 Seed data created');
+  console.log('🌱 Seed data created successfully');
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error('❌ Error seeding:', e);
     process.exit(1);
   })
   .finally(async () => {

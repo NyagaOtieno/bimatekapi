@@ -7,10 +7,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum VehicleClassId {
+  MOTORCYCLE_PRIVATE
+  MOTORCYCLE_PSV
+  MOTORCYCLE_COMMERCIAL
+  TRICYCLE_OWN_GOODS
+  TRICYCLE_PSV
+  MOTORVEHICLE_PRIVATE
+  MOTORVEHICLE_OWN_GOODS
+  MOTORVEHICLE_GENERAL_CARTAGE
+  MOTORVEHICLE_AGRICULTURE
+  MOTORVEHICLE_CHAUFFEUR
+  MOTOR_TRADE
+  MOTORVEHICLE_INSTITUTIONAL
+  MOTORVEHICLE_DRIVING_SCHOOL
+  MOTORVEHICLE_TOUR_SERVICE
+  PSV_MATATU
+  PSV_TAXI
+  PSV_BUS
+  AMBULANCE_FIRE
+  HEAVY_MACHINERY
+  UBER
+  TANKER_LIQUID
+  PRIME_MOVER
+}
+
 model User {
-  id       Int      @id @default(autoincrement())
+  id       Int    @id @default(autoincrement())
   name     String
-  email    String   @unique
+  email    String @unique
   password String
 
   // Relations
@@ -18,83 +43,85 @@ model User {
   policies Policy[]
   quotes   Quote[]
 }
-model Product {
-  id                 Int      @id @default(autoincrement())
-  name               String
-  description        String
-  basePremium        Float
-  underwriter        String
-  vehicleClass       String
-  coverage           String
-  period             String      // e.g., "1 year"
-  value              Float       // e.g., 1500000
-  make               String
-  yearOfManufacture  Int
-  tonnage            Int?
-  passengers         Int?
-  agentcode          String
 
-  quotes             Quote[]
-  policies           Policy[]
+model Product {
+  id                Int            @id @default(autoincrement())
+  name              String
+  description       String
+  basePremium       Float
+  underwriter       String
+  vehicleClass      VehicleClassId
+  coverage          String
+  period            String // e.g., "1 year"
+  value             Float // e.g., 1500000
+  make              String
+  yearOfManufacture Int
+  tonnage           Int?
+  passengers        Int?
+  agentcode         String
+
+  quotes   Quote[]
+  policies Policy[]
 
   @@unique([vehicleClass, coverage, make, yearOfManufacture, period, agentcode])
 }
 
-
 model Quote {
-  id                Int      @id @default(autoincrement())
+  id                Int     @id @default(autoincrement())
   productId         Int
-  userId            Int?     // optional for anonymous quote
+  userId            Int?
   price             Float
   value             Float
   period            Int
-  make              String?  // optional
-  yearOfManufacture Int?     // optional
+  make              String?
+  yearOfManufacture Int?
   agent_code        Int
 
-  name_contact      String
-  email             String
-  phone_number      String
+  name_contact String
+  email        String
+  phone_number String
 
-  // ✅ Additional fields to support frontend journey
-  vehicle_reg       String?  // e.g. KDA 123A
-  cover             String   // e.g. "Comprehensive"
-  coverperiod       String   // e.g. "1 year"
-  tonnage           Int?     // optional
-  passengers        Int?     // optional
+  vehicle_reg String?
+  cover       String
+  coverperiod String
+  tonnage     Int?
+  passengers  Int?
 
-  createdAt         DateTime @default(now())
+  createdAt DateTime @default(now())
 
   // Relations
-  product           Product  @relation(fields: [productId], references: [id])
-  user              User?    @relation(fields: [userId], references: [id])
-  policy            Policy?  @relation("QuoteToPolicy", fields: [id], references: [quoteId])
+  product Product @relation(fields: [productId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+  policy  Policy? @relation("QuoteToPolicy") // only name, no fields
 }
 
 model Policy {
-  id        Int     @id @default(autoincrement())
-  quoteId   Int
+  id        Int @id @default(autoincrement())
+  quoteId   Int @unique
   productId Int
   userId    Int
 
   // Relations
-  quote     Quote   @relation("QuoteToPolicy", fields: [quoteId], references: [id])
-  product   Product @relation(fields: [productId], references: [id])
-  user      User    @relation(fields: [userId], references: [id])
+  quote    Quote   @relation("QuoteToPolicy", fields: [quoteId], references: [id])
+  product  Product @relation(fields: [productId], references: [id])
+  user     User    @relation(fields: [userId], references: [id])
+  claims   Claim[] // Added back-relation for Claim
+  Client   Client? @relation(fields: [clientId], references: [id])
+  clientId Int?
 }
 
 model Client {
-  id       Int      @id @default(autoincrement())
-  name     String
-  email    String
-  phone    String
-  address  String
-  userId   Int
+  id      Int    @id @default(autoincrement())
+  name    String
+  email   String
+  phone   String
+  address String
+  userId  Int
 
   // Relations
   claims   Claim[]
   user     User     @relation(fields: [userId], references: [id])
-  policies Policy[]
+  policies Policy[] // Already defined; matches Policy relation
 }
 
 model Claim {
@@ -107,6 +134,6 @@ model Claim {
   reason    String
 
   // Relations
-  client    Client   @relation(fields: [clientId], references: [id])
-  policy    Policy   @relation(fields: [policyId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+  policy Policy @relation(fields: [policyId], references: [id])
 }
