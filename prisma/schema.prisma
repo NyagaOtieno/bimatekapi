@@ -60,8 +60,8 @@ model Product {
   ExcludedMakes   String?      // Optional; for Comprehensive filters
   passengers      Int?         // For PSV
   tonnage         Int?         // For commercial
-  minTonnage      Int?         // Tonnage lower limit
-  maxTonnage      Int?         // Tonnage upper limit
+  minTonnage      Int?         // Tonnage lower limit (optional logic use only)
+  maxTonnage      Int?         // Tonnage upper limit (optional logic use only)
   agentcode       String
 
   // ✅ Vehicle age restrictions
@@ -86,7 +86,8 @@ model Product {
   quotes          Quote[]
   policies        Policy[]
 
-  @@unique([vehicleClass, coverage, period, agentcode])
+  // Replaced strict uniqueness constraint with index for flexibility
+  @@index([vehicleClass, coverage, period, agentcode, underwriter])
 }
 
 model Quote {

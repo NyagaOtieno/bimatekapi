@@ -26,10 +26,9 @@ router.post('/', async (req, res) => {
     premium_6months,
     premium_annual,
     ExcludedMakes,
-    confirmUpdate // ✅ user confirmation to update existing product
+    confirmUpdate
   } = req.body;
 
-  // ✅ Required fields check (adjusted)
   const requiredFields = {
     name,
     description,
@@ -51,64 +50,82 @@ router.post('/', async (req, res) => {
     });
   }
 
+  const data = {
+    name,
+    description,
+    basePremium: parseFloat(basePremium),
+    underwriter,
+    vehicleClass,
+    coverage,
+    period,
+    tonnage: tonnage ? parseInt(tonnage) : null,
+    passengers: passengers ? parseInt(passengers) : null,
+    agentcode,
+    minAge: minAge ? parseInt(minAge) : null,
+    maxAge: maxAge ? parseInt(maxAge) : null,
+    minValue: minValue ? parseFloat(minValue) : null,
+    maxValue: maxValue ? parseFloat(maxValue) : null,
+    premium_week: premium_week ? parseFloat(premium_week) : null,
+    premium_2weeks: premium_2weeks ? parseFloat(premium_2weeks) : null,
+    premium_month: premium_month ? parseFloat(premium_month) : null,
+    premium_3months: premium_3months ? parseFloat(premium_3months) : null,
+    premium_6months: premium_6months ? parseFloat(premium_6months) : null,
+    premium_annual: premium_annual ? parseFloat(premium_annual) : null,
+    ExcludedMakes
+  };
+
   try {
-    // 🔍 Look for a product with same vehicleClass, coverage, period, agentcode, and underwriter
-    const existingProduct = await prisma.product.findFirst({
+    // Build duplicate detection filter
+    const filterConditions = [
+      {
+        minAge: { lte: data.maxAge || 100 },
+        maxAge: { gte: data.minAge || 0 }
+      },
+      {
+        minValue: { lte: data.maxValue || 99999999 },
+        maxValue: { gte: data.minValue || 0 }
+      }
+    ];
+
+    if (data.tonnage !== null && data.tonnage !== undefined) {
+      filterConditions.push({ tonnage: data.tonnage });
+    }
+
+    if (data.passengers !== null && data.passengers !== undefined) {
+      filterConditions.push({ passengers: data.passengers });
+    }
+
+    const potentialConflict = await prisma.product.findFirst({
       where: {
         vehicleClass,
         coverage,
         period,
         agentcode,
-        underwriter
+        underwriter,
+        AND: filterConditions
       }
     });
 
-    const data = {
-      name,
-      description,
-      basePremium: parseFloat(basePremium),
-      underwriter,
-      vehicleClass,
-      coverage,
-      period,
-      tonnage: tonnage ? parseInt(tonnage) : null,
-      passengers: passengers ? parseInt(passengers) : null,
-      agentcode,
-      minAge: minAge ? parseInt(minAge) : null,
-      maxAge: maxAge ? parseInt(maxAge) : null,
-      minValue: minValue ? parseFloat(minValue) : null,
-      maxValue: maxValue ? parseFloat(maxValue) : null,
-      premium_week: premium_week ? parseFloat(premium_week) : null,
-      premium_2weeks: premium_2weeks ? parseFloat(premium_2weeks) : null,
-      premium_month: premium_month ? parseFloat(premium_month) : null,
-      premium_3months: premium_3months ? parseFloat(premium_3months) : null,
-      premium_6months: premium_6months ? parseFloat(premium_6months) : null,
-      premium_annual: premium_annual ? parseFloat(premium_annual) : null,
-      ExcludedMakes
-    };
+    if (potentialConflict && !confirmUpdate) {
+      return res.status(409).json({
+        error: 'Duplicate or overlapping product exists for this agent and underwriter.',
+        existingProduct: potentialConflict,
+        message: 'Include "confirmUpdate": true to overwrite the existing product.'
+      });
+    }
 
-    let product;
-
-    if (existingProduct && confirmUpdate) {
-      product = await prisma.product.update({
-        where: { id: existingProduct.id },
+    if (potentialConflict && confirmUpdate) {
+      const updated = await prisma.product.update({
+        where: { id: potentialConflict.id },
         data
       });
       return res.status(200).json({
         message: '✅ Product updated successfully.',
-        product
+        product: updated
       });
     }
 
-    if (existingProduct && !confirmUpdate) {
-      return res.status(409).json({
-        warning: 'A similar product already exists for this agent and underwriter.',
-        existingProduct,
-        message: 'Include "confirmUpdate": true in the request body to overwrite it.'
-      });
-    }
-
-    product = await prisma.product.create({ data });
+    const product = await prisma.product.create({ data });
 
     return res.status(201).json({
       message: '✅ Product created successfully.',
