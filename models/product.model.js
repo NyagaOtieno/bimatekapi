@@ -11,7 +11,7 @@ module.exports = (sequelize) => {
     coverage: { type: DataTypes.STRING, allowNull: false },
     make: { type: DataTypes.STRING, allowNull: false },
     agentcode: { type: DataTypes.STRING, allowNull: false },
-    period: { type: DataTypes.STRING, allowNull: false },
+    coverPeriod: { type: DataTypes.STRING, allowNull: false },
 
     value: { type: DataTypes.FLOAT, allowNull: false },
     yearOfManufacture: { type: DataTypes.INTEGER, allowNull: false },
@@ -26,7 +26,7 @@ module.exports = (sequelize) => {
     indexes: [
       {
         unique: true,
-        fields: ['underwriter', 'vehicleClass', 'coverage', 'period', 'agentcode']
+        fields: ['underwriter', 'vehicleClass', 'coverage', 'coverPeriod', 'agentcode']
       }
     ]
   });

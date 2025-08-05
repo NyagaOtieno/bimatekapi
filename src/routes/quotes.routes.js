@@ -62,12 +62,12 @@ router.post('/', async (req, res) => {
     tonnage,
     passengers,
     cover,
-    coverperiod,
+    coverPeriod,
     vehicle_reg
   } = req.body;
 
   const vehicleClassEnum = vehicleClassMap[vehicleClass];
-  const parsedPeriod = period?.toString();
+  const parsedPeriod = coverPeriod?.toString();
   const parsedValue = value ? parseFloat(value) : null;
   const parsedYOM = yearOfManufacture ? parseInt(yearOfManufacture) : null;
   const parsedAgentCode = agent_code?.toString();
@@ -85,7 +85,7 @@ router.post('/', async (req, res) => {
       where: {
         vehicleClass: vehicleClassEnum,
         coverage: normalizedCoverage,
-        period: parsedPeriod,
+        coverPeriod: parsedPeriod,
         agentcode: parsedAgentCode,
         NOT: {
           ExcludedMakes: {

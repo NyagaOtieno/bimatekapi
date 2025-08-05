@@ -56,7 +56,7 @@ model Product {
   underwriter     String
   vehicleClass    VehicleClass
   coverage        CoverageType
-  period          String?      // Optional for TPO
+  coverPeriod          String?      // Optional for TPO
   ExcludedMakes   String?      // Optional; for Comprehensive filters
   passengers      Int?         // For PSV
   tonnage         Int?         // For commercial
@@ -87,7 +87,7 @@ model Product {
   policies        Policy[]
 
   // Replaced strict uniqueness constraint with index for flexibility
-  @@index([vehicleClass, coverage, period, agentcode, underwriter])
+  @@index([vehicleClass, coverage, coverPeriod, agentcode, underwriter])
 }
 
 model Quote {
@@ -96,7 +96,7 @@ model Quote {
   userId            Int?
   price             Float
   value             Float?
-  period            String
+  coverPeriod     String ?   // 👈 Add this
   make              String?
   yearOfManufacture Int?
   agent_code        String
