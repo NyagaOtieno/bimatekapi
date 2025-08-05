@@ -51,7 +51,6 @@ router.post('/', async (req, res) => {
   const {
     vehicleClass,
     coverage,
-    period,
     value,
     make,
     yearOfManufacture,
@@ -66,17 +65,17 @@ router.post('/', async (req, res) => {
     vehicle_reg
   } = req.body;
 
-  const vehicleClassEnum = vehicleClassMap[vehicleClass];
-  const parsedPeriod = coverPeriod?.toString();
+  const vehicleClassEnum = vehicleClassMap[vehicleClass?.toString()];
+  const parsedCoverPeriod = coverPeriod?.toString();
   const parsedValue = value ? parseFloat(value) : null;
   const parsedYOM = yearOfManufacture ? parseInt(yearOfManufacture) : null;
   const parsedAgentCode = agent_code?.toString();
   const normalizedCoverage = coverage?.toUpperCase();
 
   // Basic field validation
-  if (!vehicleClassEnum || !normalizedCoverage || !parsedPeriod || !parsedAgentCode) {
+  if (!vehicleClassEnum || !normalizedCoverage || !parsedCoverPeriod || !parsedAgentCode) {
     return res.status(400).json({
-      error: 'Missing required vehicleClass, coverage, period, or agent_code.'
+      error: 'Missing required field: vehicleClass, coverage, coverPeriod, or agent_code.'
     });
   }
 
@@ -85,7 +84,7 @@ router.post('/', async (req, res) => {
       where: {
         vehicleClass: vehicleClassEnum,
         coverage: normalizedCoverage,
-        coverPeriod: parsedPeriod,
+        coverPeriod: parsedCoverPeriod,
         agentcode: parsedAgentCode,
         NOT: {
           ExcludedMakes: {
@@ -107,7 +106,7 @@ router.post('/', async (req, res) => {
     if (normalizedCoverage === 'COMPREHENSIVE') {
       if (!parsedValue || !parsedYOM) {
         return res.status(400).json({
-          error: 'Comprehensive cover requires value and yearOfManufacture.'
+          error: 'Comprehensive cover requires both value and yearOfManufacture.'
         });
       }
 
@@ -150,10 +149,10 @@ router.post('/', async (req, res) => {
     }
 
     else if (normalizedCoverage === 'TPO') {
-      premium = getTpoPremium(product, parsedPeriod);
+      premium = getTpoPremium(product, parsedCoverPeriod);
       if (!premium) {
         return res.status(400).json({
-          error: 'TPO premium not set for the selected period.',
+          error: 'TPO premium not set for the selected cover period.',
           availablePeriods: {
             week: product.premium_week,
             twoWeeks: product.premium_2weeks,
@@ -170,7 +169,6 @@ router.post('/', async (req, res) => {
       data: {
         productId: product.id,
         value: parsedValue,
-        period: parsedPeriod,
         make: make || null,
         yearOfManufacture: parsedYOM,
         agent_code: parsedAgentCode,
@@ -181,7 +179,7 @@ router.post('/', async (req, res) => {
         tonnage: tonnage ? parseInt(tonnage) : null,
         passengers: passengers ? parseInt(passengers) : null,
         cover: cover || normalizedCoverage,
-        coverperiod: coverperiod || parsedPeriod,
+        coverPeriod: parsedCoverPeriod,
         vehicle_reg
       }
     });
