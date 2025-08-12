@@ -1,4 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient } = require('@prisma/client'); 
 const prisma = new PrismaClient();
 
 async function upsertSafeProduct(data) {
@@ -88,7 +88,7 @@ async function main() {
     vehicleClass: 'MOTORCYCLE_PRIVATE',
     coverage: 'COMPREHENSIVE',
     coverPeriod: '12',
-    ExcludedMakes: 'TOYOTA PROBOX',
+    ExcludedMakes: ['TOYOTA PROBOX','HONDA WAVE', 'YAMAHA YBR'],  // <-- Changed to array
     tonnage: 0,
     passengers: 1,
     agentcode: '31212',
