@@ -24,6 +24,7 @@ model Product {
   description     String
   underwriter     String
   agentcode       String
+  make            String?      // ✅ Added field
   createdAt       DateTime     @default(now())
   passengers      Int?
   coverPeriod     String?
@@ -136,6 +137,7 @@ enum VehicleClass {
 }
 
 enum CoverageType {
-  TPO
+  THIRD_PARTY_ONLY
+  THIRD_PARTY_FIRE_AND_THEFT
   COMPREHENSIVE
 }

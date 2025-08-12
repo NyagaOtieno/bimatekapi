@@ -8,7 +8,14 @@ module.exports = (sequelize) => {
     underwriter: { type: DataTypes.STRING, allowNull: false },
 
     vehicleClass: { type: DataTypes.STRING, allowNull: false },
-    coverage: { type: DataTypes.STRING, allowNull: false },
+    coverage: { 
+      type: DataTypes.ENUM(
+        'THIRD_PARTY_ONLY',
+        'THIRD_PARTY_FIRE_AND_THEFT',
+        'COMPREHENSIVE'
+      ), 
+      allowNull: false 
+    },
     make: { type: DataTypes.STRING, allowNull: false },
     agentcode: { type: DataTypes.STRING, allowNull: false },
     coverPeriod: { type: DataTypes.STRING, allowNull: false },

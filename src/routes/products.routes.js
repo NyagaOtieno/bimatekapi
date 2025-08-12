@@ -1,17 +1,39 @@
-// routes/product.routes.js
 const express = require("express");
 const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
+
+// Helper to normalize coverage strings
+function normalizeCoverage(value) {
+  if (!value) return undefined;
+
+  const map = {
+    "THIRD PARTY ONLY": "THIRD_PARTY_ONLY",
+    "THIRD_PARTY_ONLY": "THIRD_PARTY_ONLY",
+    "THIRD PARTY FIRE AND THEFT": "THIRD_PARTY_ONLY", // 🔄 treat as THIRD_PARTY_ONLY
+    "THIRD_PARTY_FIRE_AND_THEFT": "THIRD_PARTY_ONLY", // 🔄 treat as THIRD_PARTY_ONLY
+    "COMPREHENSIVE": "COMPREHENSIVE"
+  };
+
+  const key = value.trim().toUpperCase();
+  return map[key] || undefined;
+}
 
 // ========================
 // CREATE a new product
 // ========================
 router.post("/", async (req, res) => {
   try {
+    // Normalize enum values before sending to Prisma
+    const normalizedData = {
+      ...req.body,
+      coverage: normalizeCoverage(req.body.coverage),
+    };
+
     const product = await prisma.product.create({
-      data: req.body,
+      data: normalizedData,
     });
+
     res.status(201).json(product);
   } catch (error) {
     console.error("Error creating product:", error);
@@ -59,15 +81,20 @@ router.get("/:id", async (req, res) => {
 // ========================
 router.put("/:id", async (req, res) => {
   try {
+    const normalizedData = {
+      ...req.body,
+      coverage: normalizeCoverage(req.body.coverage),
+    };
+
     const product = await prisma.product.update({
       where: { id: parseInt(req.params.id) },
-      data: req.body,
+      data: normalizedData,
     });
+
     res.json(product);
   } catch (error) {
     console.error("Error updating product:", error);
     if (error.code === "P2025") {
-      // Prisma's "record not found"
       return res.status(404).json({ message: "Product not found" });
     }
     res
