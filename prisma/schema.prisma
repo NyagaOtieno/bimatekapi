@@ -24,10 +24,9 @@ model Product {
   description     String
   underwriter     String
   agentcode       String
-  make            String?      // ✅ Added field
   createdAt       DateTime     @default(now())
   passengers      Int?
-  coverPeriod     String?
+  period          String?
   updatedAt       DateTime     @updatedAt
   maxAge          Int?
   maxValue        Float?
@@ -48,7 +47,7 @@ model Product {
   policies        Policy[]
   quotes          Quote[]
 
-  @@index([vehicleClass, coverage, coverPeriod, agentcode, underwriter], map: "Product_vehicleClass_coverage_period_agentcode_underwriter_idx")
+  @@index([vehicleClass, coverage, period, agentcode, underwriter])
 }
 
 model Quote {
@@ -58,7 +57,7 @@ model Quote {
   price             Float
   createdAt         DateTime @default(now())
   make              String?
-  coverPeriod       String
+  period            String
   value             Float?
   yearOfManufacture Int?
   agent_code        String
@@ -137,7 +136,6 @@ enum VehicleClass {
 }
 
 enum CoverageType {
-  THIRD_PARTY_ONLY
-  THIRD_PARTY_FIRE_AND_THEFT
+  TPO
   COMPREHENSIVE
 }
