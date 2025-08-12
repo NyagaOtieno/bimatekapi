@@ -81,14 +81,67 @@ router.get("/:id", async (req, res) => {
 // ========================
 router.put("/:id", async (req, res) => {
   try {
-    const normalizedData = {
-      ...req.body,
-      coverage: normalizeCoverage(req.body.coverage),
+    const {
+      name,
+      basePremium,
+      description,
+      underwriter,
+      agentcode,
+      passengers,
+      coverPeriod,
+      maxAge,
+      maxValue,
+      minAge,
+      minValue,
+      premium_2weeks,
+      premium_3months,
+      premium_6months,
+      premium_annual,
+      premium_month,
+      premium_week,
+      ExcludedMakes,
+      coverage,
+      vehicleClass,
+      maxTonnage,
+      minTonnage,
+      tonnage,
+    } = req.body;
+
+    // Normalize coverage enum value
+    const normalizedCoverage = normalizeCoverage(coverage);
+
+    // Ensure ExcludedMakes is always an array (or empty array)
+    const normalizedExcludedMakes = Array.isArray(ExcludedMakes) ? ExcludedMakes : [];
+
+    const updatedData = {
+      name,
+      basePremium,
+      description,
+      underwriter,
+      agentcode,
+      passengers: passengers || null,
+      coverPeriod: coverPeriod || null,
+      maxAge: maxAge || null,
+      maxValue: maxValue || null,
+      minAge: minAge || null,
+      minValue: minValue || null,
+      premium_2weeks: premium_2weeks || null,
+      premium_3months: premium_3months || null,
+      premium_6months: premium_6months || null,
+      premium_annual: premium_annual || null,
+      premium_month: premium_month || null,
+      premium_week: premium_week || null,
+      ExcludedMakes: normalizedExcludedMakes,
+      coverage: normalizedCoverage,
+      vehicleClass,
+      maxTonnage: maxTonnage || null,
+      minTonnage: minTonnage || null,
+      tonnage: tonnage || null,
     };
 
     const product = await prisma.product.update({
       where: { id: parseInt(req.params.id) },
-      data: normalizedData,
+      data: updatedData,
     });
 
     res.json(product);

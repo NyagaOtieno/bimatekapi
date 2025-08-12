@@ -41,7 +41,7 @@ model Product {
   premium_week    Float?
   ExcludedMakes   String[]     // Array of excluded vehicle makes
   coverage        CoverageType
-  vehicleClass    VehicleClass
+  vehicleClass    String[]?
   maxTonnage      Int?
   minTonnage      Int?
   tonnage         Int?
