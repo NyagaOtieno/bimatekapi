@@ -35,8 +35,8 @@ const calculateComprehensivePremium = (rate, value) => {
 };
 
 // Select TPO premium based on period
-const getTpoPremium = (product, period) => {
-  switch (parseInt(period)) {
+const getTpoPremium = (product, coverPeriod) => {
+  switch (parseInt(coverPeriod)) {
     case 1: return product.premium_week;
     case 2: return product.premium_2weeks;
     case 4: return product.premium_month;

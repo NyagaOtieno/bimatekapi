@@ -1,142 +1,77 @@
-const express = require('express');
+// routes/product.routes.js
+const express = require("express");
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const db = require("../models");
+const Product = db.Product;
 
-router.post('/', async (req, res) => {
-  const {
-    name,
-    description,
-    basePremium,
-    underwriter,
-    vehicleClass,
-    coverage,
-    period,
-    tonnage,
-    passengers,
-    agentcode,
-    minAge,
-    maxAge,
-    minValue,
-    maxValue,
-    premium_week,
-    premium_2weeks,
-    premium_month,
-    premium_3months,
-    premium_6months,
-    premium_annual,
-    ExcludedMakes,
-    confirmUpdate
-  } = req.body;
-
-  const requiredFields = {
-    name,
-    description,
-    basePremium,
-    underwriter,
-    vehicleClass,
-    coverage,
-    period,
-    agentcode
-  };
-
-  const missingFields = Object.entries(requiredFields)
-    .filter(([_, v]) => v === undefined || v === null || v === '')
-    .map(([k]) => k);
-
-  if (missingFields.length > 0) {
-    return res.status(400).json({
-      error: `Missing required fields: ${missingFields.join(', ')}`,
-    });
-  }
-
-  const data = {
-    name,
-    description,
-    basePremium: parseFloat(basePremium),
-    underwriter,
-    vehicleClass,
-    coverage,
-    period,
-    tonnage: tonnage ? parseInt(tonnage) : null,
-    passengers: passengers ? parseInt(passengers) : null,
-    agentcode,
-    minAge: minAge ? parseInt(minAge) : null,
-    maxAge: maxAge ? parseInt(maxAge) : null,
-    minValue: minValue ? parseFloat(minValue) : null,
-    maxValue: maxValue ? parseFloat(maxValue) : null,
-    premium_week: premium_week ? parseFloat(premium_week) : null,
-    premium_2weeks: premium_2weeks ? parseFloat(premium_2weeks) : null,
-    premium_month: premium_month ? parseFloat(premium_month) : null,
-    premium_3months: premium_3months ? parseFloat(premium_3months) : null,
-    premium_6months: premium_6months ? parseFloat(premium_6months) : null,
-    premium_annual: premium_annual ? parseFloat(premium_annual) : null,
-    ExcludedMakes
-  };
-
+// ========================
+// CREATE a new product
+// ========================
+router.post("/", async (req, res) => {
   try {
-    // Build duplicate detection filter
-    const filterConditions = [
-      {
-        minAge: { lte: data.maxAge || 100 },
-        maxAge: { gte: data.minAge || 0 }
-      },
-      {
-        minValue: { lte: data.maxValue || 99999999 },
-        maxValue: { gte: data.minValue || 0 }
-      }
-    ];
-
-    if (data.tonnage !== null && data.tonnage !== undefined) {
-      filterConditions.push({ tonnage: data.tonnage });
-    }
-
-    if (data.passengers !== null && data.passengers !== undefined) {
-      filterConditions.push({ passengers: data.passengers });
-    }
-
-    const potentialConflict = await prisma.product.findFirst({
-      where: {
-        vehicleClass,
-        coverage,
-        period,
-        agentcode,
-        underwriter,
-        AND: filterConditions
-      }
-    });
-
-    if (potentialConflict && !confirmUpdate) {
-      return res.status(409).json({
-        error: 'Duplicate or overlapping product exists for this agent and underwriter.',
-        existingProduct: potentialConflict,
-        message: 'Include "confirmUpdate": true to overwrite the existing product.'
-      });
-    }
-
-    if (potentialConflict && confirmUpdate) {
-      const updated = await prisma.product.update({
-        where: { id: potentialConflict.id },
-        data
-      });
-      return res.status(200).json({
-        message: '✅ Product updated successfully.',
-        product: updated
-      });
-    }
-
-    const product = await prisma.product.create({ data });
-
-    return res.status(201).json({
-      message: '✅ Product created successfully.',
-      product
-    });
+    const product = await Product.create(req.body);
+    res.status(201).json(product);
   } catch (error) {
-    console.error('❌ Error in product POST:', error);
-    return res.status(500).json({
-      error: 'Internal server error',
-      detail: error.message
-    });
+    console.error("Error creating product:", error);
+    res.status(500).json({ message: "Failed to create product", error: error.message });
+  }
+});
+
+// ========================
+// GET all products
+// ========================
+router.get("/", async (req, res) => {
+  try {
+    const products = await Product.findAll();
+    res.json(products);
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    res.status(500).json({ message: "Failed to fetch products", error: error.message });
+  }
+});
+
+// ========================
+// GET a single product by ID
+// ========================
+router.get("/:id", async (req, res) => {
+  try {
+    const product = await Product.findByPk(req.params.id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    res.json(product);
+  } catch (error) {
+    console.error("Error fetching product:", error);
+    res.status(500).json({ message: "Failed to fetch product", error: error.message });
+  }
+});
+
+// ========================
+// UPDATE a product by ID
+// ========================
+router.put("/:id", async (req, res) => {
+  try {
+    const [updated] = await Product.update(req.body, { where: { id: req.params.id } });
+    if (!updated) return res.status(404).json({ message: "Product not found" });
+
+    const updatedProduct = await Product.findByPk(req.params.id);
+    res.json(updatedProduct);
+  } catch (error) {
+    console.error("Error updating product:", error);
+    res.status(500).json({ message: "Failed to update product", error: error.message });
+  }
+});
+
+// ========================
+// DELETE a product by ID
+// ========================
+router.delete("/:id", async (req, res) => {
+  try {
+    const deleted = await Product.destroy({ where: { id: req.params.id } });
+    if (!deleted) return res.status(404).json({ message: "Product not found" });
+
+    res.json({ message: "Product deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    res.status(500).json({ message: "Failed to delete product", error: error.message });
   }
 });
 

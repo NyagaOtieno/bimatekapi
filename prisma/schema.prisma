@@ -7,6 +7,109 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id       Int      @id @default(autoincrement())
+  name     String
+  email    String   @unique
+  password String
+  clients  Client[]
+  policies Policy[]
+  quotes   Quote[]
+}
+
+model Product {
+  id              Int          @id @default(autoincrement())
+  name            String
+  basePremium     Float
+  description     String
+  underwriter     String
+  agentcode       String
+  createdAt       DateTime     @default(now())
+  passengers      Int?
+  coverPeriod     String?
+  updatedAt       DateTime     @updatedAt
+  maxAge          Int?
+  maxValue        Float?
+  minAge          Int?
+  minValue        Float?
+  premium_2weeks  Float?
+  premium_3months Float?
+  premium_6months Float?
+  premium_annual  Float?
+  premium_month   Float?
+  premium_week    Float?
+  ExcludedMakes   String?
+  coverage        CoverageType
+  vehicleClass    VehicleClass
+  maxTonnage      Int?
+  minTonnage      Int?
+  tonnage         Int?
+  policies        Policy[]
+  quotes          Quote[]
+
+  @@index([vehicleClass, coverage, coverPeriod, agentcode, underwriter], map: "Product_vehicleClass_coverage_period_agentcode_underwriter_idx")
+}
+
+model Quote {
+  id                Int      @id @default(autoincrement())
+  productId         Int
+  userId            Int?
+  price             Float
+  createdAt         DateTime @default(now())
+  make              String?
+  coverPeriod       String
+  value             Float?
+  yearOfManufacture Int?
+  agent_code        String
+  cover             String
+  email             String
+  name_contact      String
+  passengers        Int?
+  phone_number      String
+  tonnage           Int?
+  vehicle_reg       String?
+  policy            Policy?  @relation("QuoteToPolicy")
+  product           Product  @relation(fields: [productId], references: [id])
+  user              User?    @relation(fields: [userId], references: [id])
+}
+
+model Policy {
+  id        Int     @id @default(autoincrement())
+  clientId  Int?
+  productId Int
+  quoteId   Int     @unique
+  userId    Int
+  claims    Claim[]
+  Client    Client? @relation(fields: [clientId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+  quote     Quote   @relation("QuoteToPolicy", fields: [quoteId], references: [id])
+  user      User    @relation(fields: [userId], references: [id])
+}
+
+model Client {
+  id       Int      @id @default(autoincrement())
+  name     String
+  email    String   @unique
+  phone    String
+  address  String
+  userId   Int
+  claims   Claim[]
+  user     User     @relation(fields: [userId], references: [id])
+  policies Policy[]
+}
+
+model Claim {
+  id        Int      @id @default(autoincrement())
+  policyId  Int
+  status    String
+  amount    Int
+  clientId  Int
+  createdAt DateTime @default(now())
+  reason    String
+  client    Client   @relation(fields: [clientId], references: [id])
+  policy    Policy   @relation(fields: [policyId], references: [id])
+}
+
 enum VehicleClass {
   MOTORCYCLE_PRIVATE
   MOTORCYCLE_PSV
@@ -35,123 +138,4 @@ enum VehicleClass {
 enum CoverageType {
   TPO
   COMPREHENSIVE
-}
-
-model User {
-  id       Int    @id @default(autoincrement())
-  name     String
-  email    String @unique
-  password String
-
-  clients  Client[]
-  policies Policy[]
-  quotes   Quote[]
-}
-
-model Product {
-  id              Int           @id @default(autoincrement())
-  name            String
-  description     String
-  basePremium     Float
-  underwriter     String
-  vehicleClass    VehicleClass
-  coverage        CoverageType
-  coverPeriod          String?      // Optional for TPO
-  ExcludedMakes   String?      // Optional; for Comprehensive filters
-  passengers      Int?         // For PSV
-  tonnage         Int?         // For commercial
-  minTonnage      Int?         // Tonnage lower limit (optional logic use only)
-  maxTonnage      Int?         // Tonnage upper limit (optional logic use only)
-  agentcode       String
-
-  // ✅ Vehicle age restrictions
-  minAge          Int?
-  maxAge          Int?
-
-  // ✅ Vehicle value restrictions
-  minValue        Float?
-  maxValue        Float?
-
-  // ✅ TPO-specific premiums
-  premium_week    Float?
-  premium_2weeks  Float?
-  premium_month   Float?
-  premium_3months Float?
-  premium_6months Float?
-  premium_annual  Float?
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  quotes          Quote[]
-  policies        Policy[]
-
-  // Replaced strict uniqueness constraint with index for flexibility
-  @@index([vehicleClass, coverage, coverPeriod, agentcode, underwriter])
-}
-
-model Quote {
-  id                Int     @id @default(autoincrement())
-  productId         Int
-  userId            Int?
-  price             Float
-  value             Float?
-  coverPeriod     String ?   // 👈 Add this
-  make              String?
-  yearOfManufacture Int?
-  agent_code        String
-
-  name_contact      String
-  email             String
-  phone_number      String
-
-  vehicle_reg       String?
-  cover             String
-  tonnage           Int?
-  passengers        Int?
-
-  createdAt         DateTime @default(now())
-
-  product           Product  @relation(fields: [productId], references: [id])
-  user              User?    @relation(fields: [userId], references: [id])
-  policy            Policy?  @relation("QuoteToPolicy")
-}
-
-model Policy {
-  id        Int  @id @default(autoincrement())
-  quoteId   Int  @unique
-  productId Int
-  userId    Int
-  clientId  Int?
-
-  quote     Quote   @relation("QuoteToPolicy", fields: [quoteId], references: [id])
-  product   Product @relation(fields: [productId], references: [id])
-  user      User    @relation(fields: [userId], references: [id])
-  Client    Client? @relation(fields: [clientId], references: [id])
-  claims    Claim[]
-}
-
-model Client {
-  id       Int      @id @default(autoincrement())
-  name     String
-  email    String   @unique
-  phone    String
-  address  String
-  userId   Int
-  user     User     @relation(fields: [userId], references: [id])
-  claims   Claim[]
-  policies Policy[]
-}
-
-model Claim {
-  id        Int      @id @default(autoincrement())
-  policyId  Int
-  status    String
-  amount    Int
-  clientId  Int
-  createdAt DateTime @default(now())
-  reason    String
-
-  client    Client @relation(fields: [clientId], references: [id])
-  policy    Policy @relation(fields: [policyId], references: [id])
 }
