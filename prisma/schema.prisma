@@ -24,9 +24,10 @@ model Product {
   description     String
   underwriter     String
   agentcode       String
+  // Removed 'make' from Product
   createdAt       DateTime     @default(now())
   passengers      Int?
-  period          String?
+  coverPeriod     String?
   updatedAt       DateTime     @updatedAt
   maxAge          Int?
   maxValue        Float?
@@ -38,7 +39,7 @@ model Product {
   premium_annual  Float?
   premium_month   Float?
   premium_week    Float?
-  ExcludedMakes   String?
+  ExcludedMakes   String[]     // Array of excluded vehicle makes
   coverage        CoverageType
   vehicleClass    VehicleClass
   maxTonnage      Int?
@@ -47,7 +48,7 @@ model Product {
   policies        Policy[]
   quotes          Quote[]
 
-  @@index([vehicleClass, coverage, period, agentcode, underwriter])
+  @@index([vehicleClass, coverage, coverPeriod, agentcode, underwriter])
 }
 
 model Quote {
@@ -56,8 +57,7 @@ model Quote {
   userId            Int?
   price             Float
   createdAt         DateTime @default(now())
-  make              String?
-  period            String
+  coverPeriod       String
   value             Float?
   yearOfManufacture Int?
   agent_code        String
@@ -68,6 +68,7 @@ model Quote {
   phone_number      String
   tonnage           Int?
   vehicle_reg       String?
+  make              String?    // make is only here now
   policy            Policy?  @relation("QuoteToPolicy")
   product           Product  @relation(fields: [productId], references: [id])
   user              User?    @relation(fields: [userId], references: [id])
@@ -136,6 +137,7 @@ enum VehicleClass {
 }
 
 enum CoverageType {
-  TPO
+  THIRD_PARTY_ONLY
+  THIRD_PARTY_FIRE_AND_THEFT
   COMPREHENSIVE
 }
