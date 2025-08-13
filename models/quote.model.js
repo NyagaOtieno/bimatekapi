@@ -11,7 +11,19 @@ module.exports = (sequelize) => {
     email: { type: DataTypes.STRING, allowNull: false },
     phone_number: { type: DataTypes.STRING, allowNull: false },
     vehicle_reg: { type: DataTypes.STRING, allowNull: true },
-    cover: { type: DataTypes.STRING, allowNull: false },
+
+    // Updated from STRING to ARRAY of ENUM values
+    cover: {
+      type: DataTypes.ARRAY(
+        DataTypes.ENUM(
+          'COMPREHENSIVE',
+          'THIRD_PARTY',
+          'THIRD_PARTY_FIRE_THEFT'
+        )
+      ),
+      allowNull: false,
+    },
+
     coverPeriod: { type: DataTypes.STRING, allowNull: false }, // ✅ The only period field now
     tonnage: { type: DataTypes.INTEGER, allowNull: true },
     passengers: { type: DataTypes.INTEGER, allowNull: true },
