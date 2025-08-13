@@ -1,4 +1,4 @@
-generator client {
+generator client { 
   provider = "prisma-client-js"
 }
 
@@ -18,17 +18,16 @@ model User {
 }
 
 model Product {
-  id              Int          @id @default(autoincrement())
+  id              Int           @id @default(autoincrement())
   name            String
   basePremium     Float
   description     String
   underwriter     String
   agentcode       String
-  // Removed 'make' from Product
-  createdAt       DateTime     @default(now())
+  createdAt       DateTime      @default(now())
   passengers      Int?
   coverPeriod     String?
-  updatedAt       DateTime     @updatedAt
+  updatedAt       DateTime      @updatedAt
   maxAge          Int?
   maxValue        Float?
   minAge          Int?
@@ -39,8 +38,8 @@ model Product {
   premium_annual  Float?
   premium_month   Float?
   premium_week    Float?
-  ExcludedMakes   String[]     // Array of excluded vehicle makes
-  coverage        CoverageType
+  ExcludedMakes   String[]      // Array of excluded vehicle makes
+  coverage        CoverageType[] // ✅ Changed to array
   vehicleClass    String[]
   maxTonnage      Int?
   minTonnage      Int?
@@ -68,7 +67,7 @@ model Quote {
   phone_number      String
   tonnage           Int?
   vehicle_reg       String?
-  make              String?    // make is only here now
+  make              String?
   policy            Policy?  @relation("QuoteToPolicy")
   product           Product  @relation(fields: [productId], references: [id])
   user              User?    @relation(fields: [userId], references: [id])
