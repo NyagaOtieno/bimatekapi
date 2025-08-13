@@ -1,4 +1,4 @@
-const { PrismaClient } = require('@prisma/client'); 
+const { PrismaClient, CoverageType } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function upsertSafeProduct(data) {
@@ -16,30 +16,26 @@ async function upsertSafeProduct(data) {
     passengers,
   } = data;
 
-  // Build dynamic filter
+  // Ensure arrays
+  const vcArray = Array.isArray(vehicleClass) ? vehicleClass : [vehicleClass];
+  const covArray = Array.isArray(coverage) ? coverage : [coverage];
+
   const conditions = [
-    {
-      minAge: { lte: maxAge ?? 99 },
-      maxAge: { gte: minAge ?? 0 },
-    },
-    {
-      minValue: { lte: maxValue ?? 99999999 },
-      maxValue: { gte: minValue ?? 0 },
-    },
+    { minAge: { lte: maxAge ?? 99 }, maxAge: { gte: minAge ?? 0 } },
+    { minValue: { lte: maxValue ?? 999999999 }, maxValue: { gte: minValue ?? 0 } },
   ];
 
   if (tonnage !== undefined && tonnage !== null) {
     conditions.push({ tonnage });
   }
-
   if (passengers !== undefined && passengers !== null) {
     conditions.push({ passengers });
   }
 
   const existing = await prisma.product.findFirst({
     where: {
-      vehicleClass,
-      coverage,
+      vehicleClass: { hasSome: vcArray },
+      coverage: { hasSome: covArray },
       coverPeriod,
       agentcode,
       underwriter,
@@ -52,7 +48,13 @@ async function upsertSafeProduct(data) {
     return existing;
   }
 
-  const created = await prisma.product.create({ data });
+  const created = await prisma.product.create({
+    data: {
+      ...data,
+      vehicleClass: vcArray,
+      coverage: covArray,
+    },
+  });
   console.log(`✅ Created product: ${data.name}`);
   return created;
 }
@@ -85,10 +87,10 @@ async function main() {
     description: 'Affordable comprehensive cover for boda boda.',
     basePremium: 0.03,
     underwriter: 'Xtra Insurance Co.',
-    vehicleClass: 'MOTORCYCLE_PRIVATE',
-    coverage: 'COMPREHENSIVE',
+    vehicleClass: ['MOTORCYCLE_PRIVATE'],
+    coverage: [CoverageType.COMPREHENSIVE],
     coverPeriod: '12',
-    ExcludedMakes: ['TOYOTA PROBOX','HONDA WAVE', 'YAMAHA YBR'],  // <-- Changed to array
+    ExcludedMakes: ['TOYOTA PROBOX', 'HONDA WAVE', 'YAMAHA YBR'],
     tonnage: 0,
     passengers: 1,
     agentcode: '31212',
@@ -99,16 +101,8 @@ async function main() {
   });
 
   const tpoCommercialConfigs = [
-    {
-      vehicleClass: 'MOTORVEHICLE_OWN_GOODS',
-      minTonnage: 0,
-      maxTonnage: 3,
-    },
-    {
-      vehicleClass: 'MOTORVEHICLE_GENERAL_CARTAGE',
-      minTonnage: 3,
-      maxTonnage: 8,
-    },
+    { vehicleClass: 'MOTORVEHICLE_OWN_GOODS', minTonnage: 0, maxTonnage: 3 },
+    { vehicleClass: 'MOTORVEHICLE_GENERAL_CARTAGE', minTonnage: 3, maxTonnage: 8 },
   ];
 
   for (const config of tpoCommercialConfigs) {
@@ -116,8 +110,8 @@ async function main() {
       name: `${config.vehicleClass} TPO`,
       description: `TPO for ${config.vehicleClass} ${config.minTonnage}-${config.maxTonnage} tons.`,
       underwriter: 'Xtra Insurance Co.',
-      vehicleClass: config.vehicleClass,
-      coverage: 'TPO',
+      vehicleClass: [config.vehicleClass],
+      coverage: [CoverageType.THIRD_PARTY_ONLY],
       coverPeriod: '1',
       agentcode: '31212',
       tonnage: config.maxTonnage,
@@ -136,14 +130,8 @@ async function main() {
   }
 
   const tpoPsvConfigs = [
-    {
-      vehicleClass: 'PSV_MATATU',
-      passengers: 14,
-    },
-    {
-      vehicleClass: 'PSV_TAXI',
-      passengers: 4,
-    },
+    { vehicleClass: 'PSV_MATATU', passengers: 14 },
+    { vehicleClass: 'PSV_TAXI', passengers: 4 },
   ];
 
   for (const config of tpoPsvConfigs) {
@@ -151,8 +139,8 @@ async function main() {
       name: `${config.vehicleClass} TPO`,
       description: `TPO for ${config.passengers}-seater ${config.vehicleClass}.`,
       underwriter: 'Xtra Insurance Co.',
-      vehicleClass: config.vehicleClass,
-      coverage: 'TPO',
+      vehicleClass: [config.vehicleClass],
+      coverage: [CoverageType.THIRD_PARTY_ONLY],
       coverPeriod: '1',
       agentcode: '31212',
       passengers: config.passengers,
