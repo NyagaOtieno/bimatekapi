@@ -17,11 +17,18 @@ model User {
   quotes   Quote[]
 }
 
+model Underwriter {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+}
+
 model Product {
   id              Int             @id @default(autoincrement())
   name            String
-  description     String?
-  underwriter     String
+  description     String
+  underwriterId   Int
+  underwriter     Underwriter     @relation(fields: [underwriterId], references: [id])
   agentcode       String
   basePremium     Float?          // Fixed premium for TPO products
   premium_annual  Float?          // Only for Comprehensive (as rate)
@@ -41,9 +48,8 @@ model Product {
   policies        Policy[]
   quotes          Quote[]
 
-  @@index([vehicleClass, coverage, coverPeriod, agentcode, underwriter], map: "Product_vehicleClass_coverage_coverPeriod_agentcode_underwr_idx")
+  @@index([vehicleClass, coverage, coverPeriod, agentcode, underwriterId], map: "Product_vehicleClass_coverage_coverPeriod_agentcode_underwr_idx")
 }
-
 
 model Quote {
   id                Int      @id @default(autoincrement())
@@ -54,7 +60,7 @@ model Quote {
   make              String?
   value             Float?
   yearOfManufacture Int?
-  agentcode        String
+  agentcode         String
   cover             String
   email             String
   name_contact      String
