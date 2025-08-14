@@ -3,31 +3,31 @@
 module.exports = {
   async up(queryInterface, Sequelize) {
     // ✅ Update Product table
-    await queryInterface.addColumn('Products', 'description', {
+    await queryInterface.addColumn('Product', 'description', {
       type: Sequelize.STRING,
       allowNull: true,
     });
-    await queryInterface.addColumn('Products', 'period', {
+    await queryInterface.addColumn('Product', 'period', {
       type: Sequelize.STRING,
       allowNull: true,
     });
-    await queryInterface.addColumn('Products', 'value', {
+    await queryInterface.addColumn('Product', 'value', {
       type: Sequelize.FLOAT,
       allowNull: true,
     });
-    await queryInterface.addColumn('Products', 'make', {
+    await queryInterface.addColumn('Product', 'make', {
       type: Sequelize.STRING,
       allowNull: true,
     });
-    await queryInterface.addColumn('Products', 'yearOfManufacture', {
+    await queryInterface.addColumn('Product', 'yearOfManufacture', {
       type: Sequelize.INTEGER,
       allowNull: true,
     });
-    await queryInterface.addColumn('Products', 'tonnage', {
+    await queryInterface.addColumn('Product', 'tonnage', {
       type: Sequelize.INTEGER,
       allowNull: true,
     });
-    await queryInterface.addColumn('Products', 'passengers', {
+    await queryInterface.addColumn('Product', 'passengers', {
       type: Sequelize.INTEGER,
       allowNull: true,
     });
@@ -57,13 +57,13 @@ module.exports = {
 
   async down(queryInterface, Sequelize) {
     // ❌ Remove added columns from Product table
-    await queryInterface.removeColumn('Products', 'description');
-    await queryInterface.removeColumn('Products', 'period');
-    await queryInterface.removeColumn('Products', 'value');
-    await queryInterface.removeColumn('Products', 'make');
-    await queryInterface.removeColumn('Products', 'yearOfManufacture');
-    await queryInterface.removeColumn('Products', 'tonnage');
-    await queryInterface.removeColumn('Products', 'passengers');
+    await queryInterface.removeColumn('Product', 'description');
+    await queryInterface.removeColumn('Product', 'period');
+    await queryInterface.removeColumn('Product', 'value');
+    await queryInterface.removeColumn('Product', 'make');
+    await queryInterface.removeColumn('Product', 'yearOfManufacture');
+    await queryInterface.removeColumn('Product', 'tonnage');
+    await queryInterface.removeColumn('Product', 'passengers');
 
     // ❌ Remove added columns from Quote table
     await queryInterface.removeColumn('Quotes', 'vehicle_reg');

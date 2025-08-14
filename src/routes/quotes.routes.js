@@ -12,7 +12,7 @@ router.post("/", async (req, res) => {
       coverage,       // might be provided
       cover,          // alternative name for coverage
       coverPeriod,
-      agent_code,
+      agentcode,
       make,
       model
     } = req.body;
@@ -21,9 +21,9 @@ router.post("/", async (req, res) => {
     const normalizedCoverage = (coverage || cover)?.toUpperCase();
 
     // Validation
-    if (!vehicleClass || !normalizedCoverage || !coverPeriod || !agent_code) {
+    if (!vehicleClass || !normalizedCoverage || !coverPeriod || !agentcode) {
       return res.status(400).json({
-        error: "Missing required field: vehicleClass, coverage/cover, coverPeriod, or agent_code."
+        error: "Missing required field: vehicleClass, coverage/cover, coverPeriod, or agentcode."
       });
     }
 
@@ -35,7 +35,7 @@ router.post("/", async (req, res) => {
         vehicleClass: { has: vehicleClassEnum },
         coverage: { has: normalizedCoverage },
         coverPeriod: coverPeriod,
-        agent_code: agent_code,
+        agentcode: agent_code,
         // Apply ExcludedMakes filter only if make is given
         NOT: make
           ? { ExcludedMakes: { contains: make, mode: "insensitive" } }
@@ -62,7 +62,7 @@ router.post("/", async (req, res) => {
         vehicleClass: vehicleClassEnum,
         coverage: normalizedCoverage,
         coverPeriod,
-        agent_code,
+        agentcode,
         make,
         model,
         premium

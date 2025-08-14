@@ -18,38 +18,32 @@ model User {
 }
 
 model Product {
-  id              Int            @id @default(autoincrement())
+  id              Int             @id @default(autoincrement())
   name            String
-  basePremium     Float
-  description     String
+  description     String?
   underwriter     String
   agentcode       String
-  createdAt       DateTime       @default(now())
-  passengers      Int?
-  updatedAt       DateTime       @updatedAt
-  maxAge          Int?
-  maxValue        Float?
-  minAge          Int?
-  minValue        Float?
-  premium_2weeks  Float?
-  premium_3months Float?
-  premium_6months Float?
-  premium_annual  Float?
-  premium_month   Float?
-  premium_week    Float?
-  coverage_old    CoverageType
-  maxTonnage      Int?
-  minTonnage      Int?
-  tonnage         Int?
-  coverPeriod     String?
-  ExcludedMakes   String[]
-  vehicleClass    String[]
-  coverage        CoverageType[] @default([])
+  basePremium     Float?          // Fixed premium for TPO products
+  premium_annual  Float?          // Only for Comprehensive (as rate)
+  coverPeriod     String?         // Used for TPO to determine premium
+  vehicleClass    VehicleClass[]
+  coverage        CoverageType[]
+  passengers      Int?            // Only for PSV TPO
+  tonnage         Int?            // Only for Commercial TPO
+  minAge          Int?            // Only for Comprehensive
+  maxAge          Int?            // Only for Comprehensive
+  minValue        Float?          // Only for Comprehensive
+  maxValue        Float?          // Only for Comprehensive
+  ExcludedMakes   String[]        // Only for Comprehensive
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
   policies        Policy[]
   quotes          Quote[]
 
-  @@index([vehicleClass, coverage_old, coverPeriod, agentcode, underwriter], map: "Product_vehicleClass_coverage_coverPeriod_agentcode_underwr_idx")
+  @@index([vehicleClass, coverage, coverPeriod, agentcode, underwriter], map: "Product_vehicleClass_coverage_coverPeriod_agentcode_underwr_idx")
 }
+
 
 model Quote {
   id                Int      @id @default(autoincrement())
@@ -60,7 +54,7 @@ model Quote {
   make              String?
   value             Float?
   yearOfManufacture Int?
-  agent_code        String
+  agentcode        String
   cover             String
   email             String
   name_contact      String

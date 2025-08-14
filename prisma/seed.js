@@ -1,8 +1,9 @@
-const { PrismaClient, CoverageType } = require('@prisma/client');
+const { PrismaClient, CoverageType } = require('@prisma/client');  
 const prisma = new PrismaClient();
 
 async function upsertSafeProduct(data) {
   const {
+    name,
     vehicleClass,
     coverage,
     coverPeriod,
@@ -14,22 +15,39 @@ async function upsertSafeProduct(data) {
     maxValue,
     tonnage,
     passengers,
+    description,
+    basePremium,
+    premium_annual,
+    ExcludedMakes,
+    premium_week,
+    premium_2weeks,
+    premium_month,
+    premium_3months,
+    premium_6months,
   } = data;
 
-  // Ensure arrays
   const vcArray = Array.isArray(vehicleClass) ? vehicleClass : [vehicleClass];
   const covArray = Array.isArray(coverage) ? coverage : [coverage];
 
-  const conditions = [
-    { minAge: { lte: maxAge ?? 99 }, maxAge: { gte: minAge ?? 0 } },
-    { minValue: { lte: maxValue ?? 999999999 }, maxValue: { gte: minValue ?? 0 } },
-  ];
+  const conditions = [];
 
-  if (tonnage !== undefined && tonnage !== null) {
-    conditions.push({ tonnage });
+  // Comprehensive & Third Party Fire & Theft uniqueness
+  if (covArray.includes(CoverageType.COMPREHENSIVE) || covArray.includes(CoverageType.THIRD_PARTY_FIRE_AND_THEFT)) {
+    if (minAge !== undefined && maxAge !== undefined) {
+      conditions.push({ minAge: { lte: maxAge ?? 99 }, maxAge: { gte: minAge ?? 0 } });
+    }
+    if (minValue !== undefined && maxValue !== undefined) {
+      conditions.push({ minValue: { lte: maxValue ?? 999999999 }, maxValue: { gte: minValue ?? 0 } });
+    }
+    if (ExcludedMakes && ExcludedMakes.length > 0) {
+      conditions.push({ ExcludedMakes: { hasSome: ExcludedMakes } });
+    }
   }
-  if (passengers !== undefined && passengers !== null) {
-    conditions.push({ passengers });
+
+  // TPO uniqueness
+  if (!covArray.includes(CoverageType.COMPREHENSIVE) && !covArray.includes(CoverageType.THIRD_PARTY_FIRE_AND_THEFT)) {
+    if (tonnage !== undefined && tonnage !== null) conditions.push({ tonnage });
+    if (passengers !== undefined && passengers !== null) conditions.push({ passengers });
   }
 
   const existing = await prisma.product.findFirst({
@@ -44,18 +62,37 @@ async function upsertSafeProduct(data) {
   });
 
   if (existing) {
-    console.log(`⚠️ Skipped duplicate: ${data.name}`);
+    console.log(`⚠️ Skipped duplicate: ${name}`);
     return existing;
   }
 
   const created = await prisma.product.create({
     data: {
-      ...data,
+      name,
+      description,
+      basePremium: basePremium || null,
+      premium_annual: premium_annual || null,
+      premium_week: premium_week || null,
+      premium_2weeks: premium_2weeks || null,
+      premium_month: premium_month || null,
+      premium_3months: premium_3months || null,
+      premium_6months: premium_6months || null,
+      underwriter,
       vehicleClass: vcArray,
       coverage: covArray,
+      agentcode,
+      coverPeriod,
+      tonnage: tonnage || null,
+      passengers: passengers || null,
+      minAge: minAge || null,
+      maxAge: maxAge || null,
+      minValue: minValue || null,
+      maxValue: maxValue || null,
+      ExcludedMakes: ExcludedMakes || null,
     },
   });
-  console.log(`✅ Created product: ${data.name}`);
+
+  console.log(`✅ Created product: ${name}`);
   return created;
 }
 
@@ -63,72 +100,84 @@ async function main() {
   const user = await prisma.user.upsert({
     where: { email: 'admin@bimatek.com' },
     update: {},
-    create: {
-      name: 'Admin User',
-      email: 'admin@bimatek.com',
-      password: 'hashed_password_here',
-    },
+    create: { name: 'Admin User', email: 'admin@bimatek.com', password: 'hashed_password_here' },
   });
 
   const client = await prisma.client.upsert({
     where: { email: 'jane@example.com' },
     update: {},
-    create: {
-      name: 'Jane Doe',
-      email: 'jane@example.com',
-      phone: '0700123456',
-      address: '123 Test Street',
-      userId: user.id,
-    },
+    create: { name: 'Jane Doe', email: 'jane@example.com', phone: '0700123456', address: '123 Test Street', userId: user.id },
   });
 
-  const compProduct = await upsertSafeProduct({
+  // -------------------------
+  // Comprehensive products
+  // -------------------------
+  await upsertSafeProduct({
     name: 'BodaBoda Comprehensive',
-    description: 'Affordable comprehensive cover for boda boda.',
-    basePremium: 0.03,
+    description: 'Comprehensive cover for boda boda based on age/value/excluded makes.',
+    premium_annual: 0.03,
     underwriter: 'Xtra Insurance Co.',
     vehicleClass: ['MOTORCYCLE_PRIVATE'],
     coverage: [CoverageType.COMPREHENSIVE],
     coverPeriod: '12',
-    ExcludedMakes: ['TOYOTA PROBOX', 'HONDA WAVE', 'YAMAHA YBR'],
-    tonnage: 0,
-    passengers: 1,
     agentcode: '31212',
+    passengers: 1,
+    tonnage: 0,
     minAge: 5,
     maxAge: 10,
     minValue: 50000,
     maxValue: 300000,
+    ExcludedMakes: ['TOYOTA PROBOX', 'HONDA WAVE', 'YAMAHA YBR'],
   });
 
+  // -------------------------
+  // TPO Commercial - tonnage based
+  // -------------------------
   const tpoCommercialConfigs = [
-    { vehicleClass: 'MOTORVEHICLE_OWN_GOODS', minTonnage: 0, maxTonnage: 3 },
-    { vehicleClass: 'MOTORVEHICLE_GENERAL_CARTAGE', minTonnage: 3, maxTonnage: 8 },
+    { vehicleClass: 'MOTORVEHICLE_OWN_GOODS', tonnage: 3 },
+    { vehicleClass: 'MOTORVEHICLE_GENERAL_CARTAGE', tonnage: 8 },
   ];
 
   for (const config of tpoCommercialConfigs) {
     await upsertSafeProduct({
       name: `${config.vehicleClass} TPO`,
-      description: `TPO for ${config.vehicleClass} ${config.minTonnage}-${config.maxTonnage} tons.`,
+      description: `TPO for ${config.vehicleClass} up to ${config.tonnage} tons.`,
       underwriter: 'Xtra Insurance Co.',
       vehicleClass: [config.vehicleClass],
       coverage: [CoverageType.THIRD_PARTY_ONLY],
       coverPeriod: '1',
       agentcode: '31212',
-      tonnage: config.maxTonnage,
-      basePremium: 0,
-      minAge: 1,
-      maxAge: 20,
-      minValue: 50000,
-      maxValue: 800000,
-      premium_week: 2000,
-      premium_2weeks: 4000,
-      premium_month: 8000,
-      premium_3months: 15000,
-      premium_6months: 28000,
-      premium_annual: 50000,
+      tonnage: config.tonnage,
+      premium_week: config.tonnage * 500,
+      premium_2weeks: config.tonnage * 1000,
+      premium_month: config.tonnage * 2000,
+      premium_3months: config.tonnage * 3500,
+      premium_6months: config.tonnage * 6000,
+      premium_annual: config.tonnage * 10000,
+    });
+
+    // Third Party Fire & Theft for same config
+    await upsertSafeProduct({
+      name: `${config.vehicleClass} TPF&T`,
+      description: `Third Party Fire & Theft for ${config.vehicleClass} up to ${config.tonnage} tons.`,
+      underwriter: 'Xtra Insurance Co.',
+      vehicleClass: [config.vehicleClass],
+      coverage: [CoverageType.THIRD_PARTY_FIRE_AND_THEFT],
+      coverPeriod: '1',
+      agentcode: '31212',
+      tonnage: config.tonnage,
+      premium_week: config.tonnage * 600,    // slightly higher fixed premium
+      premium_2weeks: config.tonnage * 1200,
+      premium_month: config.tonnage * 2500,
+      premium_3months: config.tonnage * 4000,
+      premium_6months: config.tonnage * 7000,
+      premium_annual: config.tonnage * 12000,
     });
   }
 
+  // -------------------------
+  // TPO PSV - passengers based
+  // -------------------------
   const tpoPsvConfigs = [
     { vehicleClass: 'PSV_MATATU', passengers: 14 },
     { vehicleClass: 'PSV_TAXI', passengers: 4 },
@@ -144,67 +193,36 @@ async function main() {
       coverPeriod: '1',
       agentcode: '31212',
       passengers: config.passengers,
-      basePremium: 0,
-      minAge: 1,
-      maxAge: 20,
-      minValue: 80000,
-      maxValue: 400000,
-      premium_week: 1500,
-      premium_2weeks: 3000,
-      premium_month: 6000,
-      premium_3months: 11000,
-      premium_6months: 20000,
-      premium_annual: 36000,
+      premium_week: config.passengers * 100,
+      premium_2weeks: config.passengers * 200,
+      premium_month: config.passengers * 400,
+      premium_3months: config.passengers * 750,
+      premium_6months: config.passengers * 1500,
+      premium_annual: config.passengers * 3000,
+    });
+
+    // Third Party Fire & Theft for PSV
+    await upsertSafeProduct({
+      name: `${config.vehicleClass} TPF&T`,
+      description: `Third Party Fire & Theft for ${config.passengers}-seater ${config.vehicleClass}.`,
+      underwriter: 'Xtra Insurance Co.',
+      vehicleClass: [config.vehicleClass],
+      coverage: [CoverageType.THIRD_PARTY_FIRE_AND_THEFT],
+      coverPeriod: '1',
+      agentcode: '31212',
+      passengers: config.passengers,
+      premium_week: config.passengers * 120,
+      premium_2weeks: config.passengers * 240,
+      premium_month: config.passengers * 500,
+      premium_3months: config.passengers * 900,
+      premium_6months: config.passengers * 1800,
+      premium_annual: config.passengers * 3500,
     });
   }
 
-  const quote = await prisma.quote.create({
-    data: {
-      productId: compProduct.id,
-      userId: user.id,
-      price: 3600,
-      value: 120000,
-      coverPeriod: '12',
-      make: 'Boxer',
-      yearOfManufacture: 2022,
-      agent_code: '31212',
-      name_contact: 'Jane Doe',
-      email: 'jane@example.com',
-      phone_number: '0700123456',
-      vehicle_reg: 'KDA123A',
-      cover: 'COMPREHENSIVE',
-      tonnage: 0,
-      passengers: 1,
-    },
-  });
-
-  const policy = await prisma.policy.create({
-    data: {
-      quoteId: quote.id,
-      productId: compProduct.id,
-      userId: user.id,
-      clientId: client.id,
-    },
-  });
-
-  await prisma.claim.create({
-    data: {
-      policyId: policy.id,
-      reason: 'Accident repair',
-      amount: 800,
-      clientId: client.id,
-      status: 'Pending',
-    },
-  });
-
-  console.log('🌱 Seed data created successfully');
+  console.log('🌱 Seed data including Comprehensive, TPO & TPF&T created successfully');
 }
 
 main()
-  .catch((e) => {
-    console.error('❌ Error seeding:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch((e) => { console.error('❌ Error seeding:', e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });
