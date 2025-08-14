@@ -6,6 +6,7 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -18,25 +19,21 @@ const claimsRoutes = require('./routes/claims.routes');
 const clientsRoutes = require('./routes/clients.routes');
 
 // Register route modules
-console.log('Registering routes...');
-app.use('/api/products', productsRoutes);
-console.log('✅ Registered /api/products');
+const routes = [
+  { path: '/api/products', handler: productsRoutes },
+  { path: '/api/users', handler: usersRoutes },
+  { path: '/api/quotes', handler: quotesRoutes },
+  { path: '/api/policies', handler: policiesRoutes },
+  { path: '/api/claims', handler: claimsRoutes },
+  { path: '/api/clients', handler: clientsRoutes },
+];
 
-app.use('/api/users', usersRoutes);
-console.log('✅ Registered /api/users');
+routes.forEach(route => {
+  app.use(route.path, route.handler);
+  console.log(`✅ Registered ${route.path}`);
+});
 
-app.use('/api/quotes', quotesRoutes);
-console.log('✅ Registered /api/quotes');
-
-app.use('/api/policies', policiesRoutes);
-console.log('✅ Registered /api/policies');
-
-app.use('/api/claims', claimsRoutes);
-console.log('✅ Registered /api/claims');
-
-app.use('/api/clients', clientsRoutes);
-console.log('✅ Registered /api/clients');
-
+// Start server
 app.listen(port, () => {
   console.log(`🚀 Server running on http://localhost:${port}`);
 });

@@ -1,80 +1,24 @@
 const express = require("express");
 const router = express.Router();
-const { PrismaClient } = require("@prisma/client");
+const quoteController = require("../controllers/quoteController");
 
-const prisma = new PrismaClient();
+// ========================
+// QUOTE ROUTES
+// ========================
 
-// POST /api/quotes
-router.post("/", async (req, res) => {
-  try {
-    const {
-      vehicleClass,
-      coverage,       // might be provided
-      cover,          // alternative name for coverage
-      coverPeriod,
-      agentcode,
-      make,
-      model
-    } = req.body;
+// Create a new quote
+router.post("/", quoteController.createQuote);
 
-    // Allow either "coverage" or "cover"
-    const normalizedCoverage = (coverage || cover)?.toUpperCase();
+// Get all quotes (optional filtering)
+router.get("/", quoteController.getQuotes);
 
-    // Validation
-    if (!vehicleClass || !normalizedCoverage || !coverPeriod || !agentcode) {
-      return res.status(400).json({
-        error: "Missing required field: vehicleClass, coverage/cover, coverPeriod, or agentcode."
-      });
-    }
+// Get a single quote by ID
+router.get("/:id", quoteController.getQuoteById);
 
-    const vehicleClassEnum = vehicleClass.toUpperCase();
+// Update a quote by ID
+router.put("/:id", quoteController.updateQuote);
 
-    // Fetch product that matches parameters
-    const product = await prisma.product.findFirst({
-      where: {
-        vehicleClass: { has: vehicleClassEnum },
-        coverage: { has: normalizedCoverage },
-        coverPeriod: coverPeriod,
-        agentcode: agent_code,
-        // Apply ExcludedMakes filter only if make is given
-        NOT: make
-          ? { ExcludedMakes: { contains: make, mode: "insensitive" } }
-          : undefined
-      }
-    });
-
-    if (!product) {
-      return res.status(404).json({
-        error: "No matching product found for the given criteria."
-      });
-    }
-
-    // Premium calculation (simple example)
-    const basePremium = product.basePremium || 0;
-    const rate = product.rate || 1;
-    const premium = basePremium * rate;
-
-    res.json({
-      success: true,
-      data: {
-        productId: product.id,
-        underwriter: product.underwriter,
-        vehicleClass: vehicleClassEnum,
-        coverage: normalizedCoverage,
-        coverPeriod,
-        agentcode,
-        make,
-        model,
-        premium
-      }
-    });
-
-  } catch (err) {
-    console.error("Error generating quote:", err);
-    res.status(500).json({
-      error: "Internal server error"
-    });
-  }
-});
+// Delete a quote by ID
+router.delete("/:id", quoteController.deleteQuote);
 
 module.exports = router;
