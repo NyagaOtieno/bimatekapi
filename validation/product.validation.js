@@ -115,4 +115,3 @@ const productValidationSchema = Joi.object({
 });
 
 module.exports = productValidationSchema;
-s
