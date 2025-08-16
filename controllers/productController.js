@@ -1,6 +1,7 @@
 const { PrismaClient, CoverageType } = require('@prisma/client');
 const prisma = new PrismaClient();
-const productValidationSchema = require('../validations/productValidation');
+const { productSchema } = require('../validations/productValidation');
+
 
 // Normalize coverage strings
 function normalizeCoverage(value) {
