@@ -10,9 +10,7 @@ function normalizeCoverage(value) {
   if (!value) return undefined;
   const map = {
     "THIRD PARTY ONLY": CoverageType.THIRD_PARTY_ONLY,
-    "THIRD_PARTY_ONLY": CoverageType.THIRD_PARTY_ONLY,
     "THIRD PARTY FIRE AND THEFT": CoverageType.THIRD_PARTY_FIRE_AND_THEFT,
-    "THIRD_PARTY_FIRE_AND_THEFT": CoverageType.THIRD_PARTY_FIRE_AND_THEFT,
     "COMPREHENSIVE": CoverageType.COMPREHENSIVE
   };
   const key = value.trim().toUpperCase();
