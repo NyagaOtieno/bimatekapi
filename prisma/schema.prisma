@@ -32,6 +32,7 @@ model Product {
   agentcode       String
   basePremium     Float?          // Fixed premium for TPO products
   premium_annual  Float?          // Only for Comprehensive (as rate)
+  minimumPremium Float?   // 👈 optional, only used if coverage = "Comprehensive"
   coverPeriod     String?         // Used for TPO to determine premium
   vehicleClass    VehicleClass[]
   coverage        CoverageType[]

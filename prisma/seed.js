@@ -163,6 +163,7 @@ async function main() {
     name: 'BodaBoda Comprehensive',
     description: 'Comprehensive cover for boda boda based on age/value/excluded makes.',
     premium_annual: 0.03,
+    minimumPremium: 7000,
     underwriterId: sampleUnderwriterId,
     vehicleClass: ['MOTORCYCLE_PRIVATE'],
     coverage: [CoverageType.COMPREHENSIVE],

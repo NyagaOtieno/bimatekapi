@@ -3,8 +3,6 @@ const prisma = new PrismaClient();
 // controllers/productController.js
 const { productValidationSchema } = require("../validation/product.validation");
 
-
-
 // Normalize coverage strings
 function normalizeCoverage(value) {
   if (!value) return undefined;
@@ -21,12 +19,18 @@ function normalizeCoverage(value) {
 
 // Validate coverage-specific fields
 function validateProductRules(data) {
-  const { coverage, vehicleClass, coverPeriod, passengers, tonnage, minAge, maxAge, minValue, maxValue, ExcludedMakes } = data;
+  const { coverage, vehicleClass, coverPeriod, passengers, tonnage, minAge, maxAge, minValue, maxValue, ExcludedMakes, minimumPremium } = data;
 
   switch (coverage) {
     case CoverageType.COMPREHENSIVE:
+      // ✅ minimumPremium required for Comprehensive
+      if (minimumPremium == null) throw new Error("minimumPremium is required for COMPREHENSIVE cover");
+      if (minAge == null || maxAge == null) throw new Error("minAge and maxAge are required for this coverage");
+      if (minValue == null || maxValue == null) throw new Error("minValue and maxValue are required for this coverage");
+      if (!Array.isArray(ExcludedMakes)) throw new Error("ExcludedMakes must be an array for this coverage");
+      break;
+
     case CoverageType.THIRD_PARTY_FIRE_AND_THEFT:
-      // Remove mandatory yearOfManufacture
       if (minAge == null || maxAge == null) throw new Error("minAge and maxAge are required for this coverage");
       if (minValue == null || maxValue == null) throw new Error("minValue and maxValue are required for this coverage");
       if (!Array.isArray(ExcludedMakes)) throw new Error("ExcludedMakes must be an array for this coverage");
@@ -62,7 +66,14 @@ exports.createProduct = async (req, res) => {
 
     validateProductRules(validatedData);
 
-    const product = await prisma.product.create({ data: validatedData });
+    const product = await prisma.product.create({
+      data: {
+        ...validatedData,
+        // 👇 Ensure null is stored if not applicable
+        minimumPremium: coverage === CoverageType.COMPREHENSIVE ? validatedData.minimumPremium : null,
+      },
+    });
+
     res.status(201).json({ message: 'Product created successfully', product });
   } catch (err) {
     console.error(err);
@@ -111,8 +122,12 @@ exports.updateProduct = async (req, res) => {
 
     const updatedProduct = await prisma.product.update({
       where: { id },
-      data: validatedData,
+      data: {
+        ...validatedData,
+        minimumPremium: coverage === CoverageType.COMPREHENSIVE ? validatedData.minimumPremium : null,
+      },
     });
+
     res.json({ message: 'Product updated successfully', product: updatedProduct });
   } catch (err) {
     console.error(err);
