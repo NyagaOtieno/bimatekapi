@@ -17,13 +17,15 @@ module.exports = (sequelize) => {
       },
 
       // Single coverage type - enum-like validation
-      coverage: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        validate: {
-          isIn: [["THIRD_PARTY_ONLY", "COMPREHENSIVE"]],
-        },
-      },
+    coverage: {
+  type: DataTypes.STRING,
+  allowNull: false,
+  validate: {
+    isIn: [
+      ["THIRD_PARTY_ONLY", "THIRD_PARTY_FIRE_AND_THEFT", "COMPREHENSIVE"]
+    ],
+  },
+},
 
       make: { type: DataTypes.STRING, allowNull: false },
       agentcode: { type: DataTypes.STRING, allowNull: false },
