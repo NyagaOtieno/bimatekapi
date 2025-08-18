@@ -1,6 +1,6 @@
 const Joi = require("joi");
 
-// Approved vehicle classes (exact list you provided)
+// Approved vehicle classes
 const vehicleClasses = [
   "MOTORCYCLE_PRIVATE",
   "MOTORCYCLE_PSV",
@@ -26,7 +26,7 @@ const vehicleClasses = [
   "PRIME_MOVER"
 ];
 
-// Kenyan underwriters
+// Kenyan underwriters (names only — must exist in DB)
 const underwriters = [
   'AAR Insurance (Kenya) Ltd',
   'Africa Merchant Assurance Company Ltd (AMACO)',
@@ -75,15 +75,24 @@ const coverageTypes = [
 const productValidationSchema = Joi.object({
   name: Joi.string().required(),
   description: Joi.string().allow("", null).optional(),
+
+  // ✅ validate as string (client provides name),
+  // later in controller we map it to { connect: { name } }
   underwriter: Joi.string().valid(...underwriters).required(),
+
   agentcode: Joi.string().required(),
   basePremium: Joi.number().positive().optional(),
   premium_annual: Joi.number().positive().optional(),
   coverPeriod: Joi.string().allow("", null).optional(),
-  vehicleClass: Joi.string().valid(...vehicleClasses).required(),
+
+  // ✅ allow either one string OR array of strings
+  vehicleClass: Joi.alternatives().try(
+    Joi.string().valid(...vehicleClasses),
+    Joi.array().items(Joi.string().valid(...vehicleClasses))
+  ).required(),
+
   coverage: Joi.string().valid(...coverageTypes).required(),
 
-  // 👇 Conditional field
   minimumPremium: Joi.number().positive().when("coverage", {
     is: "COMPREHENSIVE",
     then: Joi.required(),
@@ -97,7 +106,8 @@ const productValidationSchema = Joi.object({
   minValue: Joi.number().positive().optional(),
   maxValue: Joi.number().positive().optional(),
   ExcludedMakes: Joi.array().items(Joi.string()).optional(),
-  yearOfManufacture: Joi.any().forbidden()
+
+  yearOfManufacture: Joi.any().forbidden() // ✅ not allowed on product
 });
 
 module.exports = {
