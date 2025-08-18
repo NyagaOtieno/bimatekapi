@@ -31,7 +31,7 @@ async function main() {
     "Sanlam General Insurance Ltd",
     "Takaful Insurance of Africa Ltd",
     "Trident Insurance Company Ltd",
-     "Definate Insurance Company Ltd"
+    "Definate Insurance Company Ltd"
   ];
 
   for (const name of underwriters) {
@@ -50,29 +50,49 @@ async function main() {
   });
 
   if (apa) {
-    await prisma.product.upsert({
-      where: { name: "Comprehensive Motor Insurance" },
-      update: {},
-      create: {
-        name: "Comprehensive Motor Insurance",
-        description: "Covers damage to your vehicle and third-party liabilities.",
-        underwriter: {
-          connect: { id: apa.id }
+    try {
+      await prisma.product.upsert({
+        where: {
+          // Use composite key for upsert instead of just name
+          unique_product_rule: {
+            underwriterId: apa.id,
+            agentcode: "31212",
+            vehicleClass: ["MOTORVEHICLE_PRIVATE"],
+            coverage: "COMPREHENSIVE",
+            minAge: 0,
+            maxAge: 10,
+            minValue: 500000,
+            maxValue: 50000000,
+            passengers: null,
+            tonnage: null
+          }
         },
-        vehicleClass: ["MOTORVEHICLE_PRIVATE"],
-        coverage: "COMPREHENSIVE",
-        minAge: 0,
-        maxAge: 10,
-        minValue: 500000,
-        maxValue: 50000000,
-        agentcode: "31212",
-        minimumPremium: 15000, // only applicable for comprehensive
-        premium_annual: 3, // percent
-        ExcludedMakes: []
-      },
-    });
+        update: {},
+        create: {
+          name: "Comprehensive Motor Insurance",
+          description: "Covers damage to your vehicle and third-party liabilities.",
+          underwriterId: apa.id,
+          vehicleClass: ["MOTORVEHICLE_PRIVATE"],
+          coverage: "COMPREHENSIVE",
+          minAge: 0,
+          maxAge: 10,
+          minValue: 500000,
+          maxValue: 50000000,
+          agentcode: "31212",
+          minimumPremium: 15000,
+          premium_annual: 3,
+          ExcludedMakes: [],
+          passengers: null,
+          tonnage: null,
+          coverPeriod: null,
+          basePremium: null
+        },
+      });
 
-    console.log("✅ Sample product seeded successfully");
+      console.log("✅ Sample product seeded successfully");
+    } catch (err) {
+      console.error("⚠️ Product seed skipped (already exists or error):", err.message);
+    }
   }
 }
 

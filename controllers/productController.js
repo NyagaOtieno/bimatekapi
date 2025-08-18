@@ -53,6 +53,27 @@ function validateProductRules(data) {
 }
 
 /**
+ * Helper: Check for duplicate product
+ */
+async function checkDuplicateProduct(validatedData, underwriterId, excludeId = null) {
+  return prisma.product.findFirst({
+    where: {
+      underwriterId,
+      agentcode: validatedData.agentcode,
+      coverage: validatedData.coverage,
+      vehicleClass: { hasSome: validatedData.vehicleClass },
+      minAge: validatedData.minAge ?? null,
+      maxAge: validatedData.maxAge ?? null,
+      minValue: validatedData.minValue ?? null,
+      maxValue: validatedData.maxValue ?? null,
+      passengers: validatedData.passengers ?? null,
+      tonnage: validatedData.tonnage ?? null,
+      id: excludeId ? { not: excludeId } : undefined,
+    },
+  });
+}
+
+/**
  * CREATE product
  */
 exports.createProduct = async (req, res) => {
@@ -60,7 +81,6 @@ exports.createProduct = async (req, res) => {
     const { error, value } = productValidationSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    // Normalize inputs
     const coverage = normalizeCoverage(value.coverage);
     const vehicleClass = Array.isArray(value.vehicleClass) ? value.vehicleClass : [value.vehicleClass].filter(Boolean);
     const ExcludedMakes = Array.isArray(value.ExcludedMakes) ? value.ExcludedMakes : [];
@@ -70,11 +90,13 @@ exports.createProduct = async (req, res) => {
     validateProductRules(validatedData);
 
     // Ensure underwriter exists
-    const underwriter = await prisma.underwriter.findUnique({
-      where: { name: validatedData.underwriter }
-    });
-    if (!underwriter) {
-      return res.status(400).json({ message: `Underwriter '${validatedData.underwriter}' not found` });
+    const underwriter = await prisma.underwriter.findUnique({ where: { name: validatedData.underwriter } });
+    if (!underwriter) return res.status(400).json({ message: `Underwriter '${validatedData.underwriter}' not found` });
+
+    // Check for duplicate
+    const duplicate = await checkDuplicateProduct(validatedData, underwriter.id);
+    if (duplicate) {
+      return res.status(400).json({ message: "Duplicate product exists with the same underwriter, vehicle class, coverage, agent code, age/value range, passengers or tonnage" });
     }
 
     const product = await prisma.product.create({
@@ -89,39 +111,6 @@ exports.createProduct = async (req, res) => {
   } catch (err) {
     console.error("❌ Error creating product:", err);
     res.status(400).json({ message: err.message });
-  }
-};
-
-/**
- * GET all products
- */
-exports.getProducts = async (req, res) => {
-  try {
-    const products = await prisma.product.findMany({
-      include: { underwriter: true }
-    });
-    res.json({ products });
-  } catch (err) {
-    console.error("❌ Error fetching products:", err);
-    res.status(500).json({ message: 'Failed to fetch products', error: err.message });
-  }
-};
-
-/**
- * GET product by ID
- */
-exports.getProductById = async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: { underwriter: true }
-    });
-    if (!product) return res.status(404).json({ message: 'Product not found' });
-    res.json({ product });
-  } catch (err) {
-    console.error("❌ Error fetching product:", err);
-    res.status(500).json({ message: 'Failed to fetch product', error: err.message });
   }
 };
 
@@ -141,15 +130,20 @@ exports.updateProduct = async (req, res) => {
     const validatedData = { ...value, coverage, vehicleClass, ExcludedMakes };
     validateProductRules(validatedData);
 
+    // Ensure underwriter exists
     let underwriterData = {};
+    let underwriterId;
     if (validatedData.underwriter) {
-      const underwriter = await prisma.underwriter.findUnique({
-        where: { name: validatedData.underwriter }
-      });
-      if (!underwriter) {
-        return res.status(400).json({ message: `Underwriter '${validatedData.underwriter}' not found` });
-      }
+      const underwriter = await prisma.underwriter.findUnique({ where: { name: validatedData.underwriter } });
+      if (!underwriter) return res.status(400).json({ message: `Underwriter '${validatedData.underwriter}' not found` });
       underwriterData = { underwriter: { connect: { id: underwriter.id } } };
+      underwriterId = underwriter.id;
+    }
+
+    // Check for duplicate (excluding current product)
+    const duplicate = await checkDuplicateProduct(validatedData, underwriterId, id);
+    if (duplicate) {
+      return res.status(400).json({ message: "Duplicate product exists with the same underwriter, vehicle class, coverage, agent code, age/value range, passengers or tonnage" });
     }
 
     const updatedProduct = await prisma.product.update({
@@ -166,20 +160,5 @@ exports.updateProduct = async (req, res) => {
     console.error("❌ Error updating product:", err);
     if (err.code === 'P2025') return res.status(404).json({ message: 'Product not found' });
     res.status(400).json({ message: err.message });
-  }
-};
-
-/**
- * DELETE product
- */
-exports.deleteProduct = async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    await prisma.product.delete({ where: { id } });
-    res.json({ message: 'Product deleted successfully' });
-  } catch (err) {
-    console.error("❌ Error deleting product:", err);
-    if (err.code === 'P2025') return res.status(404).json({ message: 'Product not found' });
-    res.status(500).json({ message: 'Failed to delete product', error: err.message });
   }
 };
