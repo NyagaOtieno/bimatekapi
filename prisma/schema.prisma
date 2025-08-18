@@ -25,7 +25,7 @@ model Underwriter {
 
 model Product {
   id              Int             @id @default(autoincrement())
-  name            String          @unique
+  name            String          
   description     String
   underwriterId   Int
   underwriter     Underwriter     @relation(fields: [underwriterId], references: [id])

@@ -60,7 +60,7 @@ async function main() {
           connect: { id: apa.id }
         },
         vehicleClass: ["MOTORVEHICLE_PRIVATE"],
-        coverage: ["COMPREHENSIVE"],
+        coverage: "COMPREHENSIVE",
         minAge: 0,
         maxAge: 10,
         minValue: 500000,
