@@ -49,7 +49,7 @@ model Product {
   policies        Policy[]
   quotes          Quote[]
 
-  ([underwriterId, agentcode, vehicleClass, coverage, minAge, maxAge, minValue, maxValue, passengers, tonnage], )
+  @@index([coverage, coverPeriod, agentcode, underwriterId], map: "Product_coverage_coverPeriod_agentcode_underwriter_idx")
 }
 
 model Quote {
