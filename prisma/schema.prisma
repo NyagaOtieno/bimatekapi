@@ -49,7 +49,7 @@ model Product {
   policies        Policy[]
   quotes          Quote[]
 
-  @@unique([underwriterId, agentcode, vehicleClass, coverage, minAge, maxAge, minValue, maxValue, passengers, tonnage], name: "unique_product_rule")
+  ([underwriterId, agentcode, vehicleClass, coverage, minAge, maxAge, minValue, maxValue, passengers, tonnage], )
 }
 
 model Quote {
