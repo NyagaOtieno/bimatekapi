@@ -6,61 +6,55 @@ module.exports = (sequelize) => {
     "Product",
     {
       name: { type: DataTypes.STRING, allowNull: false },
-      description: { type: DataTypes.STRING },
-      basePremium: { type: DataTypes.FLOAT, allowNull: false },
+      description: { type: DataTypes.TEXT },
+
+      basePremium: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+
       underwriter: { type: DataTypes.STRING, allowNull: false },
 
-      // Multiple vehicle classes (e.g., PRIVATE, PSV, TPO_CARTAGE)
-      vehicleClass: {
-        type: DataTypes.ARRAY(DataTypes.STRING), // Postgres only
+      // Multiple vehicle classes stored as JSON array
+      vehicleClass: { type: DataTypes.JSONB, allowNull: false },
+
+      // Coverage type as ENUM
+      coverage: {
+        type: DataTypes.ENUM(
+          "THIRD_PARTY_ONLY",
+          "THIRD_PARTY_FIRE_AND_THEFT",
+          "COMPREHENSIVE"
+        ),
         allowNull: false,
       },
-
-      // Single coverage type - enum-like validation
-    coverage: {
-  type: DataTypes.STRING,
-  allowNull: false,
-  validate: {
-    isIn: [
-      ["THIRD_PARTY_ONLY", "THIRD_PARTY_FIRE_AND_THEFT", "COMPREHENSIVE"]
-    ],
-  },
-},
 
       make: { type: DataTypes.STRING, allowNull: false },
       agentcode: { type: DataTypes.STRING, allowNull: false },
       coverPeriod: { type: DataTypes.STRING, allowNull: false },
 
-      value: { type: DataTypes.FLOAT, allowNull: false },
+      value: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
       yearOfManufacture: { type: DataTypes.INTEGER, allowNull: false },
 
       // Optional tonnage for goods/cartage products
-      tonnage: { type: DataTypes.INTEGER, allowNull: true },
-      minTonnage: { type: DataTypes.INTEGER, allowNull: true },
-      maxTonnage: { type: DataTypes.INTEGER, allowNull: true },
+      tonnage: { type: DataTypes.INTEGER },
+      minTonnage: { type: DataTypes.INTEGER },
+      maxTonnage: { type: DataTypes.INTEGER },
 
-      passengers: { type: DataTypes.INTEGER, allowNull: true },
+      passengers: { type: DataTypes.INTEGER },
 
       // Age/Value ranges for premium determination
-      minAge: { type: DataTypes.INTEGER, allowNull: true },
-      maxAge: { type: DataTypes.INTEGER, allowNull: true },
-      minValue: { type: DataTypes.FLOAT, allowNull: true },
-      maxValue: { type: DataTypes.FLOAT, allowNull: true },
+      minAge: { type: DataTypes.INTEGER },
+      maxAge: { type: DataTypes.INTEGER },
+      minValue: { type: DataTypes.DECIMAL(15, 2) },
+      maxValue: { type: DataTypes.DECIMAL(15, 2) },
 
-      // Excluded vehicle makes
-      ExcludedMakes: {
-        type: DataTypes.ARRAY(DataTypes.STRING), // Postgres only
-        allowNull: true,
-        defaultValue: [],
-      },
+      // Excluded vehicle makes as JSON array
+      excludedMakes: { type: DataTypes.JSONB, allowNull: true, defaultValue: [] },
 
       // Premiums for different periods
-      premium_week: { type: DataTypes.FLOAT, allowNull: true },
-      premium_2weeks: { type: DataTypes.FLOAT, allowNull: true },
-      premium_month: { type: DataTypes.FLOAT, allowNull: true },
-      premium_3months: { type: DataTypes.FLOAT, allowNull: true },
-      premium_6months: { type: DataTypes.FLOAT, allowNull: true },
-      premium_annual: { type: DataTypes.FLOAT, allowNull: true },
+      premium_week: { type: DataTypes.DECIMAL(10, 2) },
+      premium_2weeks: { type: DataTypes.DECIMAL(10, 2) },
+      premium_month: { type: DataTypes.DECIMAL(10, 2) },
+      premium_3months: { type: DataTypes.DECIMAL(10, 2) },
+      premium_6months: { type: DataTypes.DECIMAL(10, 2) },
+      premium_annual: { type: DataTypes.DECIMAL(10, 2) },
     },
     {
       indexes: [
@@ -70,7 +64,6 @@ module.exports = (sequelize) => {
             "underwriter",
             "coverPeriod",
             "agentcode",
-            "vehicleClass",
             "coverage",
             "minAge",
             "maxAge",

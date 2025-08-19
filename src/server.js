@@ -1,31 +1,32 @@
+// server.js
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const morgan = require('morgan'); // optional: HTTP request logger
 const path = require('path');
 
 // Load environment variables
 dotenv.config();
 
+// Validate required environment variables
+const PORT = process.env.PORT || 3000;
+
+// Initialize app
 const app = express();
-const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(morgan('dev')); // logs requests (optional)
 
-/**
- * Safe import: resolves module and ensures it's an Express router
- */
+// Safe router import
 const safeImportRouter = (routePath) => {
   try {
-    const module = require(routePath);
+    const mod = require(routePath);
 
-    // If the module itself is a router, return it
-    if (module && typeof module === 'function' && module.stack) return module;
-
-    // If it's exported as default or named router
-    if (module.default && typeof module.default === 'function' && module.default.stack) return module.default;
-    if (module.router && typeof module.router === 'function' && module.router.stack) return module.router;
+    if (mod && typeof mod === 'function' && mod.stack) return mod; // router exported directly
+    if (mod.default && typeof mod.default === 'function' && mod.default.stack) return mod.default;
+    if (mod.router && typeof mod.router === 'function' && mod.router.stack) return mod.router;
 
     console.error(`❌ Module at ${routePath} is not an Express router`);
     return null;
@@ -35,31 +36,36 @@ const safeImportRouter = (routePath) => {
   }
 };
 
+// Route definitions
 const routes = [
-  { path: '/api/products', handler: safeImportRouter('./routes/products.routes') },
-  { path: '/api/users', handler: safeImportRouter('./routes/users.routes') },
-  { path: '/api/quotes', handler: safeImportRouter('./routes/quotes.routes') },
-  { path: '/api/policies', handler: safeImportRouter('./routes/policies.routes') },
-  { path: '/api/claims', handler: safeImportRouter('./routes/claims.routes') },
-  { path: '/api/clients', handler: safeImportRouter('./routes/clients.routes') },
+  { path: '/api/products', file: './routes/products.routes' },
+  { path: '/api/users', file: './routes/users.routes' },
+  { path: '/api/quotes', file: './routes/quotes.routes' },
+  { path: '/api/policies', file: './routes/policies.routes' },
+  { path: '/api/claims', file: './routes/claims.routes' },
+  { path: '/api/clients', file: './routes/clients.routes' },
 ];
 
-// Register available routes
-routes.forEach(route => {
-  if (route.handler) {
-    app.use(route.path, route.handler);
-    console.log(`✅ Registered ${route.path}`);
+// Register routes
+routes.forEach(({ path, file }) => {
+  const router = safeImportRouter(file);
+  if (router) {
+    app.use(path, router);
+    console.log(`✅ Registered route: ${path}`);
   } else {
-    console.warn(`⚠️ Skipped ${route.path} (not a valid router)`);
+    console.warn(`⚠️ Skipped route: ${path}`);
   }
 });
 
-// Default route
+// Root route
 app.get('/', (req, res) => {
-  res.json({ message: '🚀 API is running', endpoints: routes.map(r => r.path) });
+  res.json({
+    message: '🚀 API is running',
+    endpoints: routes.map((r) => r.path),
+  });
 });
 
-// Handle unknown endpoints
+// Handle 404
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
@@ -67,10 +73,10 @@ app.use((req, res) => {
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('🔥 Server Error:', err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // Start server
-app.listen(port, () => {
-  console.log(`🚀 Server running on http://localhost:${port}`);
+app.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });

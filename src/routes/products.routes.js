@@ -5,7 +5,11 @@ const productController = require("../../controllers/productController");
 // ✅ Import validation schema
 const { productValidationSchema } = require("../../validation/product.validation");
 
-// ✅ Middleware for validating request body
+// ========================
+// Middleware
+// ========================
+
+// Validate request body for product creation/update
 const validateProduct = (req, res, next) => {
   try {
     const { error } = productValidationSchema.validate(req.body, { abortEarly: false });
@@ -26,16 +30,16 @@ const validateProduct = (req, res, next) => {
 // Product Routes
 // ========================
 
-// Create a new product (with validation)
+// Create a new product
 router.post("/", validateProduct, productController.createProduct);
 
-// Get all products (with optional query filtering)
+// Get all products with optional query filtering
 router.get("/", productController.getProducts);
 
 // Get a single product by ID
 router.get("/:id", productController.getProductById);
 
-// Update a product by ID (with validation)
+// Update a product by ID
 router.put("/:id", validateProduct, productController.updateProduct);
 
 // Delete a product by ID
