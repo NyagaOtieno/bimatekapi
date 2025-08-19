@@ -35,7 +35,7 @@ model Product {
   minimumPremium Float?          // Optional, only used if coverage = "Comprehensive"
   coverPeriod    String?         // Used for TPO to determine premium
   vehicleClass   VehicleClass[]
-  coverage       CoverageType[]
+  coverage       CoverageType
   passengers     Int?            // Only for PSV TPO
   tonnage        Int?            // Only for Commercial TPO
   minAge         Int?            // Only for Comprehensive

@@ -66,7 +66,7 @@ async function checkDuplicateProduct(validatedData, underwriterId, excludeId = n
     where: {
       underwriterId,
       agentcode: validatedData.agentcode,
-      coverage: { equals: coverageEnum }, // ✅ wrap enum in filter
+      coverage: coverageEnum, // ✅ pass as single enum value
       vehicleClass: { hasSome: validatedData.vehicleClass },
       minAge: validatedData.minAge ?? null,
       maxAge: validatedData.maxAge ?? null,
