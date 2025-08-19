@@ -13,32 +13,47 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Import route modules safely
-const safeImport = (routePath) => {
+/**
+ * Safely import route module and ensure it is an Express router
+ * @param {string} relativePath - relative path to the route file
+ * @returns {Router|null}
+ */
+const safeImportRouter = (relativePath) => {
   try {
-    return require(routePath);
+    const modulePath = path.resolve(__dirname, relativePath);
+    const router = require(modulePath);
+
+    // Check if module is an Express router
+    if (router && (typeof router === 'function' || (typeof router === 'object' && router.stack))) {
+      return router;
+    }
+
+    console.warn(`⚠️ Module at ${relativePath} is not a valid Express router`);
+    return null;
   } catch (err) {
-    console.error(`❌ Failed to load route: ${routePath}`, err.message);
+    console.error(`❌ Failed to load route: ${relativePath}`, err.message);
     return null;
   }
 };
 
+// Define routes
 const routes = [
-  { path: '/api/products', handler: safeImport('./routes/products.routes') },
-  { path: '/api/users', handler: safeImport('./routes/users.routes') },
-  { path: '/api/quotes', handler: safeImport('./routes/quotes.routes') },
-  { path: '/api/policies', handler: safeImport('./routes/policies.routes') },
-  { path: '/api/claims', handler: safeImport('./routes/claims.routes') },
-  { path: '/api/clients', handler: safeImport('./routes/clients.routes') },
+  { path: '/api/products', file: './routes/products.routes' },
+  { path: '/api/users', file: './routes/users.routes' },
+  { path: '/api/quotes', file: './routes/quotes.routes' },
+  { path: '/api/policies', file: './routes/policies.routes' },
+  { path: '/api/claims', file: './routes/claims.routes' },
+  { path: '/api/clients', file: './routes/clients.routes' },
 ];
 
-// Register available routes
+// Register routes
 routes.forEach(route => {
-  if (route.handler) {
-    app.use(route.path, route.handler);
+  const router = safeImportRouter(route.file);
+  if (router) {
+    app.use(route.path, router);
     console.log(`✅ Registered ${route.path}`);
   } else {
-    console.warn(`⚠️ Skipped ${route.path} (module not found)`);
+    console.warn(`⚠️ Skipped ${route.path} (router not found or invalid)`);
   }
 });
 
