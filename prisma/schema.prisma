@@ -53,23 +53,33 @@ model Product {
 }
 
 model Quote {
-  id                Int      @id @default(autoincrement())
+  id                Int       @id @default(autoincrement())
   productId         Int
   userId            Int?
   price             Float
-  createdAt         DateTime @default(now())
+  createdAt         DateTime  @default(now())
+
+  // Vehicle info
   make              String?
   value             Float?
   yearOfManufacture Int?
+  vehicle_reg       String?
+
+  // Insurance details
   agentcode         String
-  cover             String
+  cover             String   // e.g. "TPO", "Comprehensive"
+  coverPeriod       String   // e.g. "1 year", "6 months"
+
+  // Contact details
   email             String
   name_contact      String
-  passengers        Int?
   phone_number      String
-  tonnage           Int?
-  vehicle_reg       String?
-  coverPeriod       String
+
+  // Specific use-case fields
+  passengers        Int?     // For PSV Matatu / Bus
+  tonnage           Int?     // For Commercial / General Cartage
+
+  // Relations
   policy            Policy?  @relation("QuoteToPolicy")
   product           Product  @relation(fields: [productId], references: [id])
   user              User?    @relation(fields: [userId], references: [id])

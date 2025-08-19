@@ -19,6 +19,27 @@ const quoteValidationSchema = Joi.object({
   phone_number: Joi.string().required(),
 });
 
+// Helper: calculate premium for TPO classes
+function calculateTpoPremium(vehicleClass, basePremium, tonnage, passengers) {
+  switch (vehicleClass) {
+    case 'MOTORVEHICLE_PRIVATE':
+      return basePremium || 7500;
+
+    case 'MOTORVEHICLE_OWN_GOODS':
+    case 'GENERAL_CARTAGE':
+      if (!tonnage) throw new Error('Tonnage is required for Commercial/Cartage TPO');
+      return (basePremium || 7500) + Math.ceil(tonnage / 1000) * 100;
+
+    case 'PSV_MATATU':
+    case 'PSV_BUS':
+      if (!passengers) throw new Error('Number of passengers is required for PSV TPO');
+      return (basePremium || 7500) + passengers * 200;
+
+    default:
+      throw new Error(`Unsupported vehicle class for TPO: ${vehicleClass}`);
+  }
+}
+
 // Create a new quote
 exports.createQuote = async (req, res) => {
   try {
@@ -56,15 +77,24 @@ exports.createQuote = async (req, res) => {
     }
 
     // Calculate premium
-    let premium = product.basePremium || 0;
-    if (coverage === CoverageType.COMPREHENSIVE && product.premium_annual) {
-      premium = vehicleValue ? vehicleValue * product.premium_annual : product.premium_annual;
+    let premium = 0;
+
+    if (coverage === CoverageType.COMPREHENSIVE) {
+      premium = vehicleValue
+        ? vehicleValue * (product.premium_annual || 0)
+        : product.premium_annual || product.basePremium || 0;
     }
-    if (coverage === CoverageType.THIRD_PARTY_ONLY && product.premium_annual) {
-      premium = product.premium_annual;
+
+    if (coverage === CoverageType.THIRD_PARTY_ONLY) {
+      try {
+        premium = calculateTpoPremium(vehicleClass, product.basePremium, tonnage, passengers);
+      } catch (err) {
+        return res.status(400).json({ message: err.message });
+      }
     }
-    if (coverage === CoverageType.THIRD_PARTY_FIRE_AND_THEFT && product.premium_annual) {
-      premium = product.premium_annual;
+
+    if (coverage === CoverageType.THIRD_PARTY_FIRE_AND_THEFT) {
+      premium = product.premium_annual || product.basePremium || 0;
     }
 
     // Create quote
