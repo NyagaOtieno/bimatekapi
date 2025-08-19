@@ -14,46 +14,43 @@ app.use(cors());
 app.use(express.json());
 
 /**
- * Safely import route module and ensure it is an Express router
- * @param {string} relativePath - relative path to the route file
- * @returns {Router|null}
+ * Safe import: resolves module and ensures it's an Express router
  */
-const safeImportRouter = (relativePath) => {
+const safeImportRouter = (routePath) => {
   try {
-    const modulePath = path.resolve(__dirname, relativePath);
-    const router = require(modulePath);
+    const module = require(routePath);
 
-    // Check if module is an Express router
-    if (router && (typeof router === 'function' || (typeof router === 'object' && router.stack))) {
-      return router;
-    }
+    // If the module itself is a router, return it
+    if (module && typeof module === 'function' && module.stack) return module;
 
-    console.warn(`⚠️ Module at ${relativePath} is not a valid Express router`);
+    // If it's exported as default or named router
+    if (module.default && typeof module.default === 'function' && module.default.stack) return module.default;
+    if (module.router && typeof module.router === 'function' && module.router.stack) return module.router;
+
+    console.error(`❌ Module at ${routePath} is not an Express router`);
     return null;
   } catch (err) {
-    console.error(`❌ Failed to load route: ${relativePath}`, err.message);
+    console.error(`❌ Failed to load route: ${routePath}`, err.message);
     return null;
   }
 };
 
-// Define routes
 const routes = [
-  { path: '/api/products', file: './routes/products.routes' },
-  { path: '/api/users', file: './routes/users.routes' },
-  { path: '/api/quotes', file: './routes/quotes.routes' },
-  { path: '/api/policies', file: './routes/policies.routes' },
-  { path: '/api/claims', file: './routes/claims.routes' },
-  { path: '/api/clients', file: './routes/clients.routes' },
+  { path: '/api/products', handler: safeImportRouter('./routes/products.routes') },
+  { path: '/api/users', handler: safeImportRouter('./routes/users.routes') },
+  { path: '/api/quotes', handler: safeImportRouter('./routes/quotes.routes') },
+  { path: '/api/policies', handler: safeImportRouter('./routes/policies.routes') },
+  { path: '/api/claims', handler: safeImportRouter('./routes/claims.routes') },
+  { path: '/api/clients', handler: safeImportRouter('./routes/clients.routes') },
 ];
 
-// Register routes
+// Register available routes
 routes.forEach(route => {
-  const router = safeImportRouter(route.file);
-  if (router) {
-    app.use(route.path, router);
+  if (route.handler) {
+    app.use(route.path, route.handler);
     console.log(`✅ Registered ${route.path}`);
   } else {
-    console.warn(`⚠️ Skipped ${route.path} (router not found or invalid)`);
+    console.warn(`⚠️ Skipped ${route.path} (not a valid router)`);
   }
 });
 
