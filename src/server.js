@@ -4,7 +4,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const morgan = require('morgan'); // optional: HTTP request logger
 const path = require('path');
-const morgan = require('morgan');
+
 
 // Load environment variables
 dotenv.config();
