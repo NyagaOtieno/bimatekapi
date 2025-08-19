@@ -1,7 +1,5 @@
 // models/product.js
-module.exports = (sequelize) => {
-  const { DataTypes } = require("sequelize");
-
+module.exports = (sequelize, DataTypes) => {
   const Product = sequelize.define(
     "Product",
     {
@@ -10,7 +8,8 @@ module.exports = (sequelize) => {
 
       basePremium: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
 
-      underwriter: { type: DataTypes.STRING, allowNull: false },
+      // Use underwriterId as FK to Underwriter model
+      underwriterId: { type: DataTypes.INTEGER, allowNull: false },
 
       // Multiple vehicle classes stored as JSON array
       vehicleClass: { type: DataTypes.JSONB, allowNull: false },
@@ -25,9 +24,9 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      make: { type: DataTypes.STRING, allowNull: false },
+      make: { type: DataTypes.STRING, allowNull: false }, // main vehicle make
       agentcode: { type: DataTypes.STRING, allowNull: false },
-      coverPeriod: { type: DataTypes.STRING, allowNull: false },
+      coverPeriod: { type: DataTypes.INTEGER, allowNull: false }, // numeric months
 
       value: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
       yearOfManufacture: { type: DataTypes.INTEGER, allowNull: false },
@@ -45,8 +44,11 @@ module.exports = (sequelize) => {
       minValue: { type: DataTypes.DECIMAL(15, 2) },
       maxValue: { type: DataTypes.DECIMAL(15, 2) },
 
-      // Excluded vehicle makes as JSON array
+      // Excluded vehicles (make + model) stored as JSON array
       excludedMakes: { type: DataTypes.JSONB, allowNull: true, defaultValue: [] },
+
+      // Minimum premium (required for COMPREHENSIVE)
+      minimumPremium: { type: DataTypes.DECIMAL(10, 2) },
 
       // Premiums for different periods
       premium_week: { type: DataTypes.DECIMAL(10, 2) },
@@ -61,7 +63,7 @@ module.exports = (sequelize) => {
         {
           unique: true,
           fields: [
-            "underwriter",
+            "underwriterId",
             "coverPeriod",
             "agentcode",
             "coverage",
@@ -77,6 +79,14 @@ module.exports = (sequelize) => {
       ],
     }
   );
+
+  // Associations
+  Product.associate = (models) => {
+    Product.belongsTo(models.Underwriter, {
+      foreignKey: "underwriterId",
+      as: "underwriter",
+    });
+  };
 
   return Product;
 };

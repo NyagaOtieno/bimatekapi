@@ -1,3 +1,4 @@
+// routes/product.routes.js
 const express = require("express");
 const router = express.Router();
 const productController = require("../../controllers/productController");
@@ -33,7 +34,7 @@ const validateProduct = (req, res, next) => {
 // Create a new product
 router.post("/", validateProduct, productController.createProduct);
 
-// Get all products with optional query filtering
+// Get all products (with optional query filters)
 router.get("/", productController.getProducts);
 
 // Get a single product by ID

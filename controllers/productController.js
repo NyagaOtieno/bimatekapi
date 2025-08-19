@@ -3,6 +3,10 @@ const { PrismaClient, CoverageType } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { productValidationSchema } = require("../validation/product.validation");
 
+// ========================
+// Helper Functions
+// ========================
+
 /**
  * Normalize coverage strings to match Prisma enum
  */
@@ -18,7 +22,7 @@ function normalizeCoverage(value) {
 }
 
 /**
- * Coverage-specific validation rules
+ * Validate product rules based on coverage type
  */
 function validateProductRules(data) {
   const { coverage, vehicleClass, coverPeriod, passengers, tonnage, minAge, maxAge, minValue, maxValue, ExcludedMakes, minimumPremium } = data;
@@ -53,7 +57,7 @@ function validateProductRules(data) {
 }
 
 /**
- * Helper: Check for duplicate product
+ * Check for duplicate product
  */
 async function checkDuplicateProduct(validatedData, underwriterId, excludeId = null) {
   return prisma.product.findFirst({
@@ -72,6 +76,10 @@ async function checkDuplicateProduct(validatedData, underwriterId, excludeId = n
     },
   });
 }
+
+// ========================
+// Controller Methods
+// ========================
 
 /**
  * CREATE product
@@ -96,7 +104,7 @@ exports.createProduct = async (req, res) => {
     // Check for duplicate
     const duplicate = await checkDuplicateProduct(validatedData, underwriter.id);
     if (duplicate) {
-      return res.status(400).json({ message: "Duplicate product exists with the same underwriter, vehicle class, coverage, agent code, age/value range, passengers or tonnage" });
+      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value range, passengers or tonnage" });
     }
 
     const product = await prisma.product.create({
@@ -111,6 +119,39 @@ exports.createProduct = async (req, res) => {
   } catch (err) {
     console.error("❌ Error creating product:", err);
     res.status(400).json({ message: err.message });
+  }
+};
+
+/**
+ * GET all products
+ */
+exports.getProducts = async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      include: { underwriter: true }
+    });
+    res.json(products);
+  } catch (err) {
+    console.error("❌ Error fetching products:", err);
+    res.status(500).json({ message: "Failed to fetch products" });
+  }
+};
+
+/**
+ * GET product by ID
+ */
+exports.getProductById = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: { underwriter: true }
+    });
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    res.json(product);
+  } catch (err) {
+    console.error("❌ Error fetching product:", err);
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -140,10 +181,10 @@ exports.updateProduct = async (req, res) => {
       underwriterId = underwriter.id;
     }
 
-    // Check for duplicate (excluding current product)
+    // Check for duplicate excluding current product
     const duplicate = await checkDuplicateProduct(validatedData, underwriterId, id);
     if (duplicate) {
-      return res.status(400).json({ message: "Duplicate product exists with the same underwriter, vehicle class, coverage, agent code, age/value range, passengers or tonnage" });
+      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value range, passengers or tonnage" });
     }
 
     const updatedProduct = await prisma.product.update({
@@ -160,5 +201,20 @@ exports.updateProduct = async (req, res) => {
     console.error("❌ Error updating product:", err);
     if (err.code === 'P2025') return res.status(404).json({ message: 'Product not found' });
     res.status(400).json({ message: err.message });
+  }
+};
+
+/**
+ * DELETE product
+ */
+exports.deleteProduct = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await prisma.product.delete({ where: { id } });
+    res.json({ message: "Product deleted successfully" });
+  } catch (err) {
+    console.error("❌ Error deleting product:", err);
+    if (err.code === 'P2025') return res.status(404).json({ message: 'Product not found' });
+    res.status(500).json({ message: err.message });
   }
 };

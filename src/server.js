@@ -2,9 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const morgan = require('morgan'); // optional: HTTP request logger
-const path = require('path');
-
+const morgan = require('morgan');
 
 // Load environment variables
 dotenv.config();
@@ -18,26 +16,11 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(morgan('dev')); // logs requests (optional)
+app.use(morgan('dev')); // logs requests
 
-// Safe router import
-const safeImportRouter = (routePath) => {
-  try {
-    const mod = require(routePath);
-
-    if (mod && typeof mod === 'function' && mod.stack) return mod; // router exported directly
-    if (mod.default && typeof mod.default === 'function' && mod.default.stack) return mod.default;
-    if (mod.router && typeof mod.router === 'function' && mod.router.stack) return mod.router;
-
-    console.error(`❌ Module at ${routePath} is not an Express router`);
-    return null;
-  } catch (err) {
-    console.error(`❌ Failed to load route: ${routePath}`, err.message);
-    return null;
-  }
-};
-
+// ========================
 // Route definitions
+// ========================
 const routes = [
   { path: '/api/products', file: './routes/products.routes' },
   { path: '/api/users', file: './routes/users.routes' },
@@ -49,12 +32,15 @@ const routes = [
 
 // Register routes
 routes.forEach(({ path, file }) => {
-  const router = safeImportRouter(file);
-  if (router) {
+  try {
+    const router = require(file);
+    if (!router || typeof router.use !== 'function') {
+      throw new Error('Exported module is not an Express router');
+    }
     app.use(path, router);
     console.log(`✅ Registered route: ${path}`);
-  } else {
-    console.warn(`⚠️ Skipped route: ${path}`);
+  } catch (err) {
+    console.error(`⚠️ Failed to load route ${path} from ${file}:`, err.message);
   }
 });
 
