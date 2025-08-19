@@ -60,13 +60,13 @@ function validateProductRules(data) {
  * Check for duplicate product
  */
 async function checkDuplicateProduct(validatedData, underwriterId, excludeId = null) {
-  const coverageEnum = CoverageType[validatedData.coverage]; // convert string to enum
+  const coverageEnum = normalizeCoverage(validatedData.coverage); // normalized to Prisma enum
 
   return prisma.product.findFirst({
     where: {
       underwriterId,
       agentcode: validatedData.agentcode,
-      coverage: coverageEnum, // ✅ use enum
+      coverage: { equals: coverageEnum }, // ✅ wrap enum in filter
       vehicleClass: { hasSome: validatedData.vehicleClass },
       minAge: validatedData.minAge ?? null,
       maxAge: validatedData.maxAge ?? null,
