@@ -25,17 +25,17 @@ model Underwriter {
 
 model Product {
   id              Int             @id @default(autoincrement())
-  name            String          
+  name            String
   description     String
   underwriterId   Int
   underwriter     Underwriter     @relation(fields: [underwriterId], references: [id])
   agentcode       String
   basePremium     Float?          // Fixed premium for TPO products
   premium_annual  Float?          // Only for Comprehensive (as rate)
-  minimumPremium  Float?          // Only for Comprehensive
-  coverPeriod     String?         // Used for TPO
+  minimumPremium Float?   // 👈 optional, only used if coverage = "Comprehensive"
+  coverPeriod     String?         // Used for TPO to determine premium
   vehicleClass    VehicleClass[]
-  coverage        CoverageType    // 👈 SINGLE enum now
+  coverage        CoverageType[]
   passengers      Int?            // Only for PSV TPO
   tonnage         Int?            // Only for Commercial TPO
   minAge          Int?            // Only for Comprehensive
@@ -49,7 +49,7 @@ model Product {
   policies        Policy[]
   quotes          Quote[]
 
-  @@index([coverage, coverPeriod, agentcode, underwriterId], map: "Product_coverage_coverPeriod_agentcode_underwriter_idx")
+  @@index([vehicleClass, coverage, coverPeriod, agentcode, underwriterId], map: "Product_vehicleClass_coverage_coverPeriod_agentcode_underwr_idx")
 }
 
 model Quote {
