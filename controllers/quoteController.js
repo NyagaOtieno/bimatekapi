@@ -2,7 +2,7 @@ const { PrismaClient, CoverageType } = require('@prisma/client');
 const prisma = new PrismaClient();
 const Joi = require('joi');
 
-// Quote validation schema
+// Validation schema
 const quoteValidationSchema = Joi.object({
   vehicleClass: Joi.string().required(),
   coverage: Joi.string().valid(...Object.values(CoverageType)).required(),
@@ -10,6 +10,7 @@ const quoteValidationSchema = Joi.object({
   agentcode: Joi.string().required(),
   make: Joi.string().allow(null, ''),
   model: Joi.string().allow(null, ''),
+  vehicle_reg: Joi.string().allow(null, ''),
   value: Joi.number().positive().allow(null),
   yearOfManufacture: Joi.number().integer().allow(null),
   passengers: Joi.number().integer().allow(null),
@@ -19,7 +20,15 @@ const quoteValidationSchema = Joi.object({
   phone_number: Joi.string().required(),
 });
 
-// Helper: calculate premium for TPO classes
+// Helper: normalize vehicle class
+function normalizeVehicleClass(vehicleClass, coverage) {
+  if (vehicleClass === 'GENERAL_CARTAGE' && coverage === CoverageType.THIRD_PARTY_ONLY) {
+    return 'MOTORVEHICLE_OWN_GOODS'; // map to valid enum in your DB
+  }
+  return vehicleClass;
+}
+
+// Helper: calculate premium for TPO
 function calculateTpoPremium(vehicleClass, basePremium, tonnage, passengers) {
   switch (vehicleClass) {
     case 'MOTORVEHICLE_PRIVATE':
@@ -40,19 +49,20 @@ function calculateTpoPremium(vehicleClass, basePremium, tonnage, passengers) {
   }
 }
 
-// Create a new quote
+// CREATE
 exports.createQuote = async (req, res) => {
   try {
     const { error, value } = quoteValidationSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    const {
+    let {
       vehicleClass,
       coverage,
       coverPeriod,
       agentcode,
       make,
       model,
+      vehicle_reg,
       value: vehicleValue,
       passengers,
       tonnage,
@@ -61,13 +71,16 @@ exports.createQuote = async (req, res) => {
       phone_number,
     } = value;
 
-    // Fetch matching product
+    // Normalize
+    vehicleClass = normalizeVehicleClass(vehicleClass, coverage);
+
+    // Find product
     const product = await prisma.product.findFirst({
       where: {
-        vehicleClass: { has: vehicleClass },
-        coverage: { has: coverage },
-        coverPeriod,
-        agentcode,
+        vehicleClass: { equals: vehicleClass },
+        coverage: { equals: coverage },
+        coverPeriod: { equals: coverPeriod },
+        agentcode: { equals: agentcode },
         NOT: make ? { ExcludedMakes: { has: make } } : undefined,
       },
     });
@@ -76,36 +89,28 @@ exports.createQuote = async (req, res) => {
       return res.status(404).json({ message: 'No matching product found' });
     }
 
-    // Calculate premium
+    // Premium calc
     let premium = 0;
-
     if (coverage === CoverageType.COMPREHENSIVE) {
       premium = vehicleValue
         ? vehicleValue * (product.premium_annual || 0)
         : product.premium_annual || product.basePremium || 0;
-    }
-
-    if (coverage === CoverageType.THIRD_PARTY_ONLY) {
-      try {
-        premium = calculateTpoPremium(vehicleClass, product.basePremium, tonnage, passengers);
-      } catch (err) {
-        return res.status(400).json({ message: err.message });
-      }
-    }
-
-    if (coverage === CoverageType.THIRD_PARTY_FIRE_AND_THEFT) {
+    } else if (coverage === CoverageType.THIRD_PARTY_ONLY) {
+      premium = calculateTpoPremium(vehicleClass, product.basePremium, tonnage, passengers);
+    } else if (coverage === CoverageType.THIRD_PARTY_FIRE_AND_THEFT) {
       premium = product.premium_annual || product.basePremium || 0;
     }
 
-    // Create quote
+    // Save
     const quote = await prisma.quote.create({
       data: {
         productId: product.id,
         agentcode,
-        vehicle_reg: model || null,
+        vehicle_reg: vehicle_reg || null,
         make: make || null,
+        model: model || null,
         value: vehicleValue || null,
-        yearOfManufacture: null, // optional now
+        yearOfManufacture: null,
         passengers: passengers || null,
         tonnage: tonnage || null,
         coverPeriod,
@@ -124,7 +129,7 @@ exports.createQuote = async (req, res) => {
   }
 };
 
-// GET all quotes
+// GET all
 exports.getQuotes = async (req, res) => {
   try {
     const quotes = await prisma.quote.findMany({ include: { product: true } });
@@ -135,7 +140,7 @@ exports.getQuotes = async (req, res) => {
   }
 };
 
-// GET quote by ID
+// GET by ID
 exports.getQuoteById = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -151,14 +156,33 @@ exports.getQuoteById = async (req, res) => {
   }
 };
 
-// UPDATE quote
+// UPDATE
 exports.updateQuote = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { error, value } = quoteValidationSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    const updatedQuote = await prisma.quote.update({ where: { id }, data: value });
+    const updatedQuote = await prisma.quote.update({
+      where: { id },
+      data: {
+        vehicleClass: value.vehicleClass,
+        cover: value.coverage,
+        coverPeriod: value.coverPeriod,
+        agentcode: value.agentcode,
+        make: value.make || null,
+        model: value.model || null,
+        vehicle_reg: value.vehicle_reg || null,
+        value: value.value || null,
+        yearOfManufacture: value.yearOfManufacture || null,
+        passengers: value.passengers || null,
+        tonnage: value.tonnage || null,
+        name_contact: value.name_contact,
+        email: value.email,
+        phone_number: value.phone_number,
+      },
+    });
+
     res.json({ message: 'Quote updated successfully', quote: updatedQuote });
   } catch (err) {
     console.error(err);
@@ -166,7 +190,7 @@ exports.updateQuote = async (req, res) => {
   }
 };
 
-// DELETE quote
+// DELETE
 exports.deleteQuote = async (req, res) => {
   try {
     const id = parseInt(req.params.id);

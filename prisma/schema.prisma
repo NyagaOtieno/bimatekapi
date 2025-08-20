@@ -24,51 +24,52 @@ model Underwriter {
 }
 
 model Product {
-  id             Int       @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   name           String
   description    String
   underwriterId  Int
-  underwriter    Underwriter @relation(fields: [underwriterId], references: [id])
+  underwriter    Underwriter  @relation(fields: [underwriterId], references: [id])
   agentcode      String
-  basePremium    Float?          // Fixed premium for TPO products
-  premium_annual Float?          // Only for Comprehensive (as rate)
-  minimumPremium Float?          // Optional, only used if coverage = "Comprehensive"
-  coverPeriod    String?         // Used for TPO to determine premium
+  basePremium    Float?       // Fixed premium for TPO
+  premium_annual Float?       // Percentage rate for Comprehensive
+  minimumPremium Float?       // Minimum allowed premium
+  coverPeriod    String?      // e.g. "1 year", "6 months"
   vehicleClass   VehicleClass[]
   coverage       CoverageType
-  passengers     Int?            // Only for PSV TPO
-  tonnage        Int?            // Only for Commercial TPO
-  minAge         Int?            // Only for Comprehensive
-  maxAge         Int?            // Only for Comprehensive
-  minValue       Float?          // Only for Comprehensive
-  maxValue       Float?          // Only for Comprehensive
-  ExcludedMakes  String[]        // Only for Comprehensive
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  passengers     Int?         // For PSV
+  tonnage        Int?         // For Commercial
+  minAge         Int?         // For Comprehensive
+  maxAge         Int?         // For Comprehensive
+  minValue       Float?       // For Comprehensive
+  maxValue       Float?       // For Comprehensive
+  ExcludedMakes  String[]?    // Optional exclusion list
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   policies       Policy[]
   quotes         Quote[]
 
-  @@index([vehicleClass, coverage, coverPeriod, agentcode, underwriterId], map: "Product_vehicleClass_coverage_coverPeriod_agentcode_underwr_idx")
+  @@index([coverage, agentcode, underwriterId], map: "Product_coverage_agentcode_underwriter_idx")
 }
 
 model Quote {
-  id                Int       @id @default(autoincrement())
+  id                Int          @id @default(autoincrement())
   productId         Int
   userId            Int?
   price             Float
-  createdAt         DateTime  @default(now())
+  createdAt         DateTime     @default(now())
 
   // Vehicle info
   make              String?
+  model             String?      // Added
   value             Float?
   yearOfManufacture Int?
   vehicle_reg       String?
 
   // Insurance details
   agentcode         String
-  cover             String   // e.g. "TPO", "Comprehensive"
-  coverPeriod       String   // e.g. "1 year", "6 months"
+  cover             CoverageType
+  coverPeriod       String
 
   // Contact details
   email             String
@@ -76,13 +77,13 @@ model Quote {
   phone_number      String
 
   // Specific use-case fields
-  passengers        Int?     // For PSV Matatu / Bus
-  tonnage           Int?     // For Commercial / General Cartage
+  passengers        Int?
+  tonnage           Int?
 
   // Relations
-  policy            Policy?  @relation("QuoteToPolicy")
-  product           Product  @relation(fields: [productId], references: [id])
-  user              User?    @relation(fields: [userId], references: [id])
+  policy            Policy?      @relation("QuoteToPolicy")
+  product           Product      @relation(fields: [productId], references: [id])
+  user              User?        @relation(fields: [userId], references: [id])
 }
 
 model Policy {
@@ -114,7 +115,7 @@ model Claim {
   id        Int      @id @default(autoincrement())
   policyId  Int
   status    String
-  amount    Int
+  amount    Float    // Changed from Int → Float
   clientId  Int
   createdAt DateTime @default(now())
   reason    String
