@@ -51,30 +51,29 @@ model Product {
 
   @@index([coverage, agentcode, underwriterId], map: "Product_coverage_agentcode_underwriter_idx")
 }
-
 model Quote {
   id                Int          @id @default(autoincrement())
   productId         Int
   userId            Int?
-  price             Float
+  price             Float        @db.Decimal(10,2)
   createdAt         DateTime     @default(now())
 
   // Vehicle info
-  make              String?
-  model             String?      // Added
-  value             Float?
+  make              String?      @db.VarChar(100)
+  model             String?      @db.VarChar(100)
+  value             Float?       @db.Decimal(12,2)
   yearOfManufacture Int?
-  vehicle_reg       String?
+  vehicleReg        String?      @unique @db.VarChar(50)   // Unique reg
 
   // Insurance details
-  agentcode         String
+  agentCode         String       @db.VarChar(50)
   cover             CoverageType
-  coverPeriod       String
+  coverPeriod       String       @db.VarChar(50)
 
   // Contact details
-  email             String
-  name_contact      String
-  phone_number      String
+  email             String       @db.VarChar(150)
+  contactName       String       @db.VarChar(120)
+  phoneNumber       String       @db.VarChar(30)
 
   // Specific use-case fields
   passengers        Int?
@@ -84,7 +83,12 @@ model Quote {
   policy            Policy?      @relation("QuoteToPolicy")
   product           Product      @relation(fields: [productId], references: [id])
   user              User?        @relation(fields: [userId], references: [id])
+
+  @@index([agentCode])
+  @@index([cover])
+  @@index([vehicleReg])
 }
+
 
 model Policy {
   id        Int     @id @default(autoincrement())
