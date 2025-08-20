@@ -55,38 +55,38 @@ model Quote {
   id                Int          @id @default(autoincrement())
   productId         Int
   userId            Int?
-  price             Float        @db.Decimal(10,2)
   createdAt         DateTime     @default(now())
 
-  // Vehicle info
+  /// --- Vehicle Information ---
+  vehicleReg        String       @unique @db.VarChar(50)   // Unique registration number
   make              String?      @db.VarChar(100)
   model             String?      @db.VarChar(100)
-  value             Float?       @db.Decimal(12,2)
-  yearOfManufacture Int?
-  vehicleReg        String?      @unique @db.VarChar(50)   // Unique reg
+  yearOfManufacture Int?         @db.SmallInt             // 4-digit year
+  value             Decimal?     @db.Decimal(12,2)        // Vehicle value
+  tonnage           Int?         @db.SmallInt
+  passengers        Int?         @db.SmallInt
 
-  // Insurance details
-  agentCode         String       @db.VarChar(50)
+  /// --- Insurance Details ---
   cover             CoverageType
-  coverPeriod       String       @db.VarChar(50)
+  coverPeriod       String       @db.VarChar(50)          // e.g., "Annual", "6 Months"
+  agentCode         String       @db.VarChar(50)
+  price             Decimal      @db.Decimal(10,2)
 
-  // Contact details
-  email             String       @db.VarChar(150)
+  /// --- Contact Details ---
   contactName       String       @db.VarChar(120)
+  email             String       @db.VarChar(150)
   phoneNumber       String       @db.VarChar(30)
 
-  // Specific use-case fields
-  passengers        Int?
-  tonnage           Int?
-
-  // Relations
+  /// --- Relations ---
   policy            Policy?      @relation("QuoteToPolicy")
-  product           Product      @relation(fields: [productId], references: [id])
-  user              User?        @relation(fields: [userId], references: [id])
+  product           Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user              User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  /// --- Indexes for Query Optimization ---
   @@index([agentCode])
   @@index([cover])
   @@index([vehicleReg])
+  @@index([createdAt])
 }
 
 
