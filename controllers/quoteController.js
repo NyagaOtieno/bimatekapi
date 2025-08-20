@@ -23,7 +23,7 @@ const quoteValidationSchema = Joi.object({
 // Helper: normalize vehicle class
 function normalizeVehicleClass(vehicleClass, coverage) {
   if (vehicleClass === 'GENERAL_CARTAGE' && coverage === CoverageType.THIRD_PARTY_ONLY) {
-    return 'MOTORVEHICLE_OWN_GOODS'; // map to valid enum in your DB
+    return 'MOTORVEHICLE_OWN_GOODS'; // map to valid enum in DB
   }
   return vehicleClass;
 }
@@ -33,17 +33,14 @@ function calculateTpoPremium(vehicleClass, basePremium, tonnage, passengers) {
   switch (vehicleClass) {
     case 'MOTORVEHICLE_PRIVATE':
       return basePremium || 7500;
-
     case 'MOTORVEHICLE_OWN_GOODS':
     case 'GENERAL_CARTAGE':
       if (!tonnage) throw new Error('Tonnage is required for Commercial/Cartage TPO');
       return (basePremium || 7500) + Math.ceil(tonnage / 1000) * 100;
-
     case 'PSV_MATATU':
     case 'PSV_BUS':
       if (!passengers) throw new Error('Number of passengers is required for PSV TPO');
       return (basePremium || 7500) + passengers * 200;
-
     default:
       throw new Error(`Unsupported vehicle class for TPO: ${vehicleClass}`);
   }
@@ -71,13 +68,12 @@ exports.createQuote = async (req, res) => {
       phone_number,
     } = value;
 
-    // Normalize
     vehicleClass = normalizeVehicleClass(vehicleClass, coverage);
 
-    // Find product
+    // Find product (use `has` for list enum)
     const product = await prisma.product.findFirst({
       where: {
-        vehicleClass: { equals: vehicleClass },
+        vehicleClass: { has: vehicleClass }, // <-- updated
         coverage: { equals: coverage },
         coverPeriod: { equals: coverPeriod },
         agentcode: { equals: agentcode },
@@ -85,9 +81,7 @@ exports.createQuote = async (req, res) => {
       },
     });
 
-    if (!product) {
-      return res.status(404).json({ message: 'No matching product found' });
-    }
+    if (!product) return res.status(404).json({ message: 'No matching product found' });
 
     // Premium calc
     let premium = 0;
@@ -101,7 +95,7 @@ exports.createQuote = async (req, res) => {
       premium = product.premium_annual || product.basePremium || 0;
     }
 
-    // Save
+    // Save quote
     const quote = await prisma.quote.create({
       data: {
         productId: product.id,
