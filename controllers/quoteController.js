@@ -14,9 +14,9 @@ const searchValidationSchema = Joi.object({
   model: Joi.string().allow(null, ''),
   vehicle_reg: Joi.string().allow(null, ''),
   value: Joi.number().positive().allow(null),
-  yearOfManufacture: Joi.number().integer().allow(null),
-  passengers: Joi.number().integer().allow(null),
-  tonnage: Joi.number().integer().allow(null),
+  yearOfManufacture: Joi.number().integer().min(1980).allow(null),
+  passengers: Joi.number().integer().min(1).allow(null),
+  tonnage: Joi.number().integer().min(1).allow(null),
 });
 
 const saveQuoteValidationSchema = Joi.object({
@@ -25,15 +25,15 @@ const saveQuoteValidationSchema = Joi.object({
   make: Joi.string().allow(null, ''),
   model: Joi.string().allow(null, ''),
   value: Joi.number().positive().allow(null),
-  yearOfManufacture: Joi.number().integer().allow(null),
-  passengers: Joi.number().integer().allow(null),
-  tonnage: Joi.number().integer().allow(null),
+  yearOfManufacture: Joi.number().integer().min(1980).allow(null),
+  passengers: Joi.number().integer().min(1).allow(null),
+  tonnage: Joi.number().integer().min(1).allow(null),
   coverPeriod: Joi.string().required(),
   coverage: Joi.string().valid(...Object.values(CoverageType)).required(),
   agentcode: Joi.string().required(),
-  name_contact: Joi.string().required(),
+  name_contact: Joi.string().min(3).max(100).required(),
   email: Joi.string().email().required(),
-  phone_number: Joi.string().required(),
+  phone_number: Joi.string().pattern(/^[0-9+\-() ]{7,20}$/).required(),
   price: Joi.number().positive().required(), // client sends chosen premium
 });
 
@@ -65,21 +65,29 @@ function calculateTpoPremium(vehicleClass, basePremium, tonnage, passengers) {
 }
 
 function calculatePremium(product, coverage, vehicleClass, vehicleValue, tonnage, passengers) {
-  if (coverage === CoverageType.COMPREHENSIVE) {
-    return vehicleValue
-      ? vehicleValue * (product.premium_annual || 0)
-      : product.premium_annual || product.basePremium || 0;
-  } else if (coverage === CoverageType.THIRD_PARTY_ONLY) {
-    return calculateTpoPremium(vehicleClass, product.basePremium, tonnage, passengers);
-  } else if (coverage === CoverageType.THIRD_PARTY_FIRE_AND_THEFT) {
-    return product.premium_annual || product.basePremium || 0;
+  switch (coverage) {
+    case CoverageType.COMPREHENSIVE:
+      return vehicleValue
+        ? vehicleValue * (product.premium_annual || 0)
+        : product.premium_annual || product.basePremium || 0;
+    case CoverageType.THIRD_PARTY_ONLY:
+      return calculateTpoPremium(vehicleClass, product.basePremium, tonnage, passengers);
+    case CoverageType.THIRD_PARTY_FIRE_AND_THEFT:
+      return product.premium_annual || product.basePremium || 0;
+    default:
+      throw new Error(`Unsupported coverage type: ${coverage}`);
   }
-  throw new Error(`Unsupported coverage type: ${coverage}`);
 }
 
-// Compare premiums with tolerance (avoid float mismatch)
+// Compare premiums with tolerance
 function premiumsMatch(clientPrice, serverPrice) {
-  return Math.abs(clientPrice - serverPrice) < 1; // tolerance of 1 currency unit
+  return Math.abs(clientPrice - serverPrice) < 1;
+}
+
+// Reusable error handler
+function handleError(res, err, contextMessage) {
+  console.error(`${contextMessage} error:`, err);
+  return res.status(500).json({ message: contextMessage, error: err.message });
 }
 
 // ========================
@@ -116,8 +124,7 @@ exports.searchQuotes = async (req, res) => {
 
     res.json({ message: 'Matching products found', products: results });
   } catch (err) {
-    console.error('searchQuotes error:', err);
-    res.status(500).json({ message: 'Failed to search quotes', error: err.message });
+    return handleError(res, err, 'Failed to search quotes');
   }
 };
 
@@ -181,8 +188,7 @@ exports.createQuote = async (req, res) => {
 
     res.status(201).json({ message: 'Quote saved successfully', quote });
   } catch (err) {
-    console.error('createQuote error:', err);
-    res.status(500).json({ message: 'Failed to save quote', error: err.message });
+    return handleError(res, err, 'Failed to save quote');
   }
 };
 
@@ -192,8 +198,7 @@ exports.getQuotes = async (req, res) => {
     const quotes = await prisma.quote.findMany({ include: { product: true } });
     res.json({ quotes });
   } catch (err) {
-    console.error('getQuotes error:', err);
-    res.status(500).json({ message: 'Failed to fetch quotes', error: err.message });
+    return handleError(res, err, 'Failed to fetch quotes');
   }
 };
 
@@ -204,18 +209,16 @@ exports.getQuoteById = async (req, res) => {
     if (!id || isNaN(Number(id))) {
       return res.status(400).json({ message: 'Invalid quote ID' });
     }
-    const quoteId = Number(id);
 
     const quote = await prisma.quote.findUnique({
-      where: { id: quoteId },
+      where: { id: Number(id) },
       include: { product: true },
     });
 
     if (!quote) return res.status(404).json({ message: 'Quote not found' });
     res.json({ quote });
   } catch (err) {
-    console.error('getQuoteById error:', err);
-    res.status(500).json({ message: 'Failed to fetch quote', error: err.message });
+    return handleError(res, err, 'Failed to fetch quote');
   }
 };
 
@@ -226,12 +229,10 @@ exports.deleteQuote = async (req, res) => {
     if (!id || isNaN(Number(id))) {
       return res.status(400).json({ message: 'Invalid quote ID' });
     }
-    const quoteId = Number(id);
 
-    await prisma.quote.delete({ where: { id: quoteId } });
+    await prisma.quote.delete({ where: { id: Number(id) } });
     res.json({ message: 'Quote deleted successfully' });
   } catch (err) {
-    console.error('deleteQuote error:', err);
-    res.status(500).json({ message: 'Failed to delete quote', error: err.message });
+    return handleError(res, err, 'Failed to delete quote');
   }
 };
