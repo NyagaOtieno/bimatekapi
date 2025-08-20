@@ -62,6 +62,20 @@ function calculateTpoPremium(vehicleClass, basePremium, tonnage, passengers) {
   }
 }
 
+// Helper: calculate premium for all coverages
+function calculatePremium(product, coverage, vehicleClass, vehicleValue, tonnage, passengers) {
+  if (coverage === CoverageType.COMPREHENSIVE) {
+    return vehicleValue
+      ? vehicleValue * (product.premium_annual || 0)
+      : product.premium_annual || product.basePremium || 0;
+  } else if (coverage === CoverageType.THIRD_PARTY_ONLY) {
+    return calculateTpoPremium(vehicleClass, product.basePremium, tonnage, passengers);
+  } else if (coverage === CoverageType.THIRD_PARTY_FIRE_AND_THEFT) {
+    return product.premium_annual || product.basePremium || 0;
+  }
+  throw new Error(`Unsupported coverage type: ${coverage}`);
+}
+
 /**
  * SEARCH matching products with calculated premiums
  * POST /api/quotes/search
@@ -100,17 +114,7 @@ exports.searchQuotes = async (req, res) => {
 
     // Attach premium to each product (but don't save)
     const results = products.map((product) => {
-      let premium = 0;
-      if (coverage === CoverageType.COMPREHENSIVE) {
-        premium = vehicleValue
-          ? vehicleValue * (product.premium_annual || 0)
-          : product.premium_annual || product.basePremium || 0;
-      } else if (coverage === CoverageType.THIRD_PARTY_ONLY) {
-        premium = calculateTpoPremium(vehicleClass, product.basePremium, tonnage, passengers);
-      } else if (coverage === CoverageType.THIRD_PARTY_FIRE_AND_THEFT) {
-        premium = product.premium_annual || product.basePremium || 0;
-      }
-
+      const premium = calculatePremium(product, coverage, vehicleClass, vehicleValue, tonnage, passengers);
       return { ...product, calculatedPremium: premium };
     });
 
@@ -153,6 +157,17 @@ exports.createQuote = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
+    // 🔒 Server-side premium validation
+    const normalizedClass = normalizeVehicleClass(product.vehicleClass[0], coverage);
+    const validatedPremium = calculatePremium(product, coverage, normalizedClass, vehicleValue, tonnage, passengers);
+
+    if (price !== validatedPremium) {
+      return res.status(400).json({
+        message: 'Premium mismatch. Please use server-calculated premium.',
+        validatedPremium,
+      });
+    }
+
     const quote = await prisma.quote.create({
       data: {
         productId,
@@ -166,7 +181,7 @@ exports.createQuote = async (req, res) => {
         tonnage: tonnage || null,
         coverPeriod,
         cover: coverage,
-        price,
+        price: validatedPremium, // enforced server-side
         name_contact,
         email,
         phone_number,
