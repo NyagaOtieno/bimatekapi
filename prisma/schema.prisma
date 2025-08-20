@@ -42,7 +42,7 @@ model Product {
   maxAge         Int?         // For Comprehensive
   minValue       Float?       // For Comprehensive
   maxValue       Float?       // For Comprehensive
-  ExcludedMakes  String[]?    // Optional exclusion list
+  ExcludedMakes  String[]    // Optional exclusion list
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
