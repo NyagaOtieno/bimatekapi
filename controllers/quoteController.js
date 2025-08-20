@@ -2,7 +2,9 @@ const { PrismaClient, CoverageType } = require('@prisma/client');
 const prisma = new PrismaClient();
 const Joi = require('joi');
 
-// Validation schema for search
+// ========================
+// VALIDATION SCHEMAS
+// ========================
 const searchValidationSchema = Joi.object({
   vehicleClass: Joi.string().required(),
   coverage: Joi.string().valid(...Object.values(CoverageType)).required(),
@@ -17,7 +19,6 @@ const searchValidationSchema = Joi.object({
   tonnage: Joi.number().integer().allow(null),
 });
 
-// Validation schema for saving a quote
 const saveQuoteValidationSchema = Joi.object({
   productId: Joi.number().required(),
   vehicle_reg: Joi.string().allow(null, ''),
@@ -36,7 +37,9 @@ const saveQuoteValidationSchema = Joi.object({
   price: Joi.number().positive().required(), // client sends chosen premium
 });
 
-// Helper: normalize vehicle class
+// ========================
+// HELPERS
+// ========================
 function normalizeVehicleClass(vehicleClass, coverage) {
   if (vehicleClass === 'GENERAL_CARTAGE' && coverage === CoverageType.THIRD_PARTY_ONLY) {
     return 'MOTORVEHICLE_OWN_GOODS';
@@ -44,7 +47,6 @@ function normalizeVehicleClass(vehicleClass, coverage) {
   return vehicleClass;
 }
 
-// Helper: calculate premium for TPO
 function calculateTpoPremium(vehicleClass, basePremium, tonnage, passengers) {
   switch (vehicleClass) {
     case 'MOTORVEHICLE_PRIVATE':
@@ -62,7 +64,6 @@ function calculateTpoPremium(vehicleClass, basePremium, tonnage, passengers) {
   }
 }
 
-// Helper: calculate premium for all coverages
 function calculatePremium(product, coverage, vehicleClass, vehicleValue, tonnage, passengers) {
   if (coverage === CoverageType.COMPREHENSIVE) {
     return vehicleValue
@@ -76,43 +77,38 @@ function calculatePremium(product, coverage, vehicleClass, vehicleValue, tonnage
   throw new Error(`Unsupported coverage type: ${coverage}`);
 }
 
-/**
- * SEARCH matching products with calculated premiums
- * POST /api/quotes/search
- */
+// Compare premiums with tolerance (avoid float mismatch)
+function premiumsMatch(clientPrice, serverPrice) {
+  return Math.abs(clientPrice - serverPrice) < 1; // tolerance of 1 currency unit
+}
+
+// ========================
+// CONTROLLERS
+// ========================
+
+// SEARCH (no save)
 exports.searchQuotes = async (req, res) => {
   try {
     const { error, value } = searchValidationSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    let {
-      vehicleClass,
-      coverage,
-      coverPeriod,
-      agentcode,
-      make,
-      value: vehicleValue,
-      passengers,
-      tonnage,
-    } = value;
-
+    let { vehicleClass, coverage, coverPeriod, agentcode, make, value: vehicleValue, passengers, tonnage } = value;
     vehicleClass = normalizeVehicleClass(vehicleClass, coverage);
 
     const products = await prisma.product.findMany({
       where: {
         vehicleClass: { has: vehicleClass },
-        coverage: { equals: coverage },
-        coverPeriod: { equals: coverPeriod },
-        agentcode: { equals: agentcode },
+        coverage,
+        coverPeriod,
+        agentcode,
         NOT: make ? { ExcludedMakes: { has: make } } : undefined,
       },
     });
 
-    if (!products || products.length === 0) {
+    if (!products.length) {
       return res.status(404).json({ message: 'No matching product found' });
     }
 
-    // Attach premium to each product (but don't save)
     const results = products.map((product) => {
       const premium = calculatePremium(product, coverage, vehicleClass, vehicleValue, tonnage, passengers);
       return { ...product, calculatedPremium: premium };
@@ -120,15 +116,12 @@ exports.searchQuotes = async (req, res) => {
 
     res.json({ message: 'Matching products found', products: results });
   } catch (err) {
-    console.error(err);
+    console.error('searchQuotes error:', err);
     res.status(500).json({ message: 'Failed to search quotes', error: err.message });
   }
 };
 
-/**
- * SAVE a selected quote
- * POST /api/quotes
- */
+// SAVE selected quote
 exports.createQuote = async (req, res) => {
   try {
     const { error, value } = saveQuoteValidationSchema.validate(req.body);
@@ -153,15 +146,12 @@ exports.createQuote = async (req, res) => {
     } = value;
 
     const product = await prisma.product.findUnique({ where: { id: productId } });
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
+    if (!product) return res.status(404).json({ message: 'Product not found' });
 
-    // 🔒 Server-side premium validation
     const normalizedClass = normalizeVehicleClass(product.vehicleClass[0], coverage);
     const validatedPremium = calculatePremium(product, coverage, normalizedClass, vehicleValue, tonnage, passengers);
 
-    if (price !== validatedPremium) {
+    if (!premiumsMatch(price, validatedPremium)) {
       return res.status(400).json({
         message: 'Premium mismatch. Please use server-calculated premium.',
         validatedPremium,
@@ -180,8 +170,8 @@ exports.createQuote = async (req, res) => {
         passengers: passengers || null,
         tonnage: tonnage || null,
         coverPeriod,
-        cover: coverage,
-        price: validatedPremium, // enforced server-side
+        coverage,
+        price: validatedPremium,
         name_contact,
         email,
         phone_number,
@@ -191,7 +181,7 @@ exports.createQuote = async (req, res) => {
 
     res.status(201).json({ message: 'Quote saved successfully', quote });
   } catch (err) {
-    console.error(err);
+    console.error('createQuote error:', err);
     res.status(500).json({ message: 'Failed to save quote', error: err.message });
   }
 };
@@ -202,23 +192,29 @@ exports.getQuotes = async (req, res) => {
     const quotes = await prisma.quote.findMany({ include: { product: true } });
     res.json({ quotes });
   } catch (err) {
-    console.error(err);
+    console.error('getQuotes error:', err);
     res.status(500).json({ message: 'Failed to fetch quotes', error: err.message });
   }
 };
 
-// GET quote by ID
+// GET by ID
 exports.getQuoteById = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const { id } = req.params;
+    if (!id || isNaN(Number(id))) {
+      return res.status(400).json({ message: 'Invalid quote ID' });
+    }
+    const quoteId = Number(id);
+
     const quote = await prisma.quote.findUnique({
-      where: { id },
+      where: { id: quoteId },
       include: { product: true },
     });
+
     if (!quote) return res.status(404).json({ message: 'Quote not found' });
     res.json({ quote });
   } catch (err) {
-    console.error(err);
+    console.error('getQuoteById error:', err);
     res.status(500).json({ message: 'Failed to fetch quote', error: err.message });
   }
 };
@@ -226,11 +222,16 @@ exports.getQuoteById = async (req, res) => {
 // DELETE
 exports.deleteQuote = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    await prisma.quote.delete({ where: { id } });
+    const { id } = req.params;
+    if (!id || isNaN(Number(id))) {
+      return res.status(400).json({ message: 'Invalid quote ID' });
+    }
+    const quoteId = Number(id);
+
+    await prisma.quote.delete({ where: { id: quoteId } });
     res.json({ message: 'Quote deleted successfully' });
   } catch (err) {
-    console.error(err);
+    console.error('deleteQuote error:', err);
     res.status(500).json({ message: 'Failed to delete quote', error: err.message });
   }
 };
