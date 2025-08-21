@@ -34,7 +34,8 @@ const routes = [
 routes.forEach(({ path, file }) => {
   try {
     const router = require(file);
-    if (!router || typeof router.use !== 'function') {
+    // Ensure the router is a function (Express Router)
+    if (!router || typeof router !== 'function') {
       throw new Error('Exported module is not an Express router');
     }
     app.use(path, router);
