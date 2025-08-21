@@ -25,7 +25,7 @@ router.post(
       : res.status(500).json({ error: "createQuote not implemented" })
 );
 
-// Get all saved quotes (optional filtering)
+// Get all saved quotes
 router.get(
   "/",
   (req, res, next) =>

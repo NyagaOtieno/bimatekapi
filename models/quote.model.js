@@ -36,6 +36,10 @@ module.exports = (sequelize) => {
 
     tonnage: { type: DataTypes.INTEGER, allowNull: true },
     passengers: { type: DataTypes.INTEGER, allowNull: true },
+
+    // === NEW FIELD for minimum premium ===
+    minimumPremium: { type: DataTypes.FLOAT, allowNull: true },
+
     price: { type: DataTypes.FLOAT, allowNull: false },
     createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
   });

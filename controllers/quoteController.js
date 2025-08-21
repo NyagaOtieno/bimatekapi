@@ -1,3 +1,5 @@
+// controllers/quoteController.js
+
 const { PrismaClient, CoverageType } = require('@prisma/client');
 const prisma = new PrismaClient();
 const Joi = require('joi');
@@ -5,8 +7,6 @@ const Joi = require('joi');
 // ========================
 // VALIDATION SCHEMAS
 // ========================
-
-// Allowed cover periods matching Prisma enum
 const coverPeriods = ["ONE_WEEK", "TWO_WEEKS", "ONE_MONTH", "SIX_MONTHS", "ONE_YEAR"];
 
 const searchValidationSchema = Joi.object({
@@ -38,7 +38,7 @@ const saveQuoteValidationSchema = Joi.object({
   name_contact: Joi.string().min(3).max(100).required(),
   email: Joi.string().email().required(),
   phone_number: Joi.string().pattern(/^[0-9+\-() ]{7,20}$/).required(),
-  price: Joi.number().positive().required(), // client sends chosen premium
+  price: Joi.number().positive().required(),
 });
 
 // ========================
@@ -83,12 +83,10 @@ function calculatePremium(product, coverage, vehicleClass, vehicleValue, tonnage
   }
 }
 
-// Compare premiums with tolerance
 function premiumsMatch(clientPrice, serverPrice) {
   return Math.abs(clientPrice - serverPrice) < 1;
 }
 
-// Reusable error handler
 function handleError(res, err, contextMessage) {
   console.error(`${contextMessage} error:`, err);
   return res.status(500).json({ message: contextMessage, error: err.message });
@@ -98,7 +96,7 @@ function handleError(res, err, contextMessage) {
 // CONTROLLERS
 // ========================
 
-// FETCH QUOTE (calculate-only, no save)
+// FETCH QUOTE (calculate-only, no save, no ID!)
 exports.fetchQuote = async (req, res) => {
   try {
     const { error, value } = searchValidationSchema.validate(req.body);
@@ -132,39 +130,8 @@ exports.fetchQuote = async (req, res) => {
   }
 };
 
-// SEARCH (alias, basically same as fetch but kept separate if needed)
-exports.searchQuotes = async (req, res) => {
-  try {
-    const { error, value } = searchValidationSchema.validate(req.body);
-    if (error) return res.status(400).json({ message: error.details[0].message });
-
-    let { vehicleClass, coverage, coverPeriod, agentcode, make, value: vehicleValue, passengers, tonnage } = value;
-    vehicleClass = normalizeVehicleClass(vehicleClass, coverage);
-
-    const products = await prisma.product.findMany({
-      where: {
-        vehicleClass: { has: vehicleClass },
-        coverage,
-        coverPeriod,
-        agentcode,
-        NOT: make ? { ExcludedMakes: { has: make } } : undefined,
-      },
-    });
-
-    if (!products.length) {
-      return res.status(404).json({ message: 'No matching product found' });
-    }
-
-    const results = products.map((product) => {
-      const premium = calculatePremium(product, coverage, vehicleClass, vehicleValue, tonnage, passengers);
-      return { ...product, calculatedPremium: premium };
-    });
-
-    res.json({ message: 'Matching products found', products: results });
-  } catch (err) {
-    return handleError(res, err, 'Failed to search quotes');
-  }
-};
+// SEARCH QUOTES (alias of fetch)
+exports.searchQuotes = exports.fetchQuote;
 
 // SAVE selected quote
 exports.createQuote = async (req, res) => {
@@ -240,7 +207,7 @@ exports.getQuotes = async (req, res) => {
   }
 };
 
-// GET by ID
+// GET by ID (here, ID validation is correct)
 exports.getQuoteById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -260,7 +227,7 @@ exports.getQuoteById = async (req, res) => {
   }
 };
 
-// DELETE
+// DELETE (ID required)
 exports.deleteQuote = async (req, res) => {
   try {
     const { id } = req.params;
