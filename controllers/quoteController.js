@@ -98,7 +98,41 @@ function handleError(res, err, contextMessage) {
 // CONTROLLERS
 // ========================
 
-// SEARCH (no save)
+// FETCH QUOTE (calculate-only, no save)
+exports.fetchQuote = async (req, res) => {
+  try {
+    const { error, value } = searchValidationSchema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.details[0].message });
+
+    let { vehicleClass, coverage, coverPeriod, agentcode, make, value: vehicleValue, passengers, tonnage } = value;
+    vehicleClass = normalizeVehicleClass(vehicleClass, coverage);
+
+    const products = await prisma.product.findMany({
+      where: {
+        vehicleClass: { has: vehicleClass },
+        coverage,
+        coverPeriod,
+        agentcode,
+        NOT: make ? { ExcludedMakes: { has: make } } : undefined,
+      },
+    });
+
+    if (!products.length) {
+      return res.status(404).json({ message: 'No matching product found' });
+    }
+
+    const results = products.map((product) => {
+      const premium = calculatePremium(product, coverage, vehicleClass, vehicleValue, tonnage, passengers);
+      return { ...product, calculatedPremium: premium };
+    });
+
+    res.json({ message: 'Quote fetched successfully', products: results });
+  } catch (err) {
+    return handleError(res, err, 'Failed to fetch quote');
+  }
+};
+
+// SEARCH (alias, basically same as fetch but kept separate if needed)
 exports.searchQuotes = async (req, res) => {
   try {
     const { error, value } = searchValidationSchema.validate(req.body);

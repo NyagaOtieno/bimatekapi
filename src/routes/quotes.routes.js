@@ -7,22 +7,22 @@ const quoteController = require("../../controllers/quoteController");
 // QUOTE ROUTES
 // ========================
 
-// Fetch a quote (does not save to DB, just calculates & returns)
+// Fetch quotes (calculate only, does not save)
 router.post(
   "/fetch",
   (req, res, next) =>
-    typeof quoteController.fetchQuote === "function"
-      ? quoteController.fetchQuote(req, res, next)
-      : res.status(500).json({ error: "fetchQuote not implemented" })
+    typeof quoteController.searchQuotes === "function"
+      ? quoteController.searchQuotes(req, res, next)
+      : res.status(500).json({ error: "searchQuotes not implemented" })
 );
 
 // Save a quote (persists to DB)
 router.post(
   "/save",
   (req, res, next) =>
-    typeof quoteController.saveQuote === "function"
-      ? quoteController.saveQuote(req, res, next)
-      : res.status(500).json({ error: "saveQuote not implemented" })
+    typeof quoteController.createQuote === "function"
+      ? quoteController.createQuote(req, res, next)
+      : res.status(500).json({ error: "createQuote not implemented" })
 );
 
 // Get all saved quotes (optional filtering)
