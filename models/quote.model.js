@@ -6,25 +6,34 @@ module.exports = (sequelize) => {
     value: { type: DataTypes.FLOAT, allowNull: false },
     make: { type: DataTypes.STRING, allowNull: true },
     yearOfManufacture: { type: DataTypes.INTEGER, allowNull: true },
-    agent_code: { type: DataTypes.STRING, allowNull: false }, // Changed to STRING to match Prisma
+    agent_code: { type: DataTypes.STRING, allowNull: false }, 
     name_contact: { type: DataTypes.STRING, allowNull: false },
     email: { type: DataTypes.STRING, allowNull: false },
     phone_number: { type: DataTypes.STRING, allowNull: false },
     vehicle_reg: { type: DataTypes.STRING, allowNull: true },
 
-    // Updated from STRING to ARRAY of ENUM values
+    // Updated from STRING to ENUM for cover
     cover: {
-      type: DataTypes.ARRAY(
-        DataTypes.ENUM(
-          'COMPREHENSIVE',
-          'THIRD_PARTY',
-          'THIRD_PARTY_FIRE_THEFT'
-        )
+      type: DataTypes.ENUM(
+        'COMPREHENSIVE',
+        'THIRD_PARTY_ONLY',
+        'THIRD_PARTY_FIRE_AND_THEFT'
       ),
       allowNull: false,
     },
 
-    coverPeriod: { type: DataTypes.STRING, allowNull: false }, // ✅ The only period field now
+    // Updated from STRING to ENUM for coverPeriod
+    coverPeriod: {
+      type: DataTypes.ENUM(
+        'ONE_WEEK',
+        'TWO_WEEKS',
+        'ONE_MONTH',
+        'SIX_MONTHS',
+        'ONE_YEAR'
+      ),
+      allowNull: false,
+    },
+
     tonnage: { type: DataTypes.INTEGER, allowNull: true },
     passengers: { type: DataTypes.INTEGER, allowNull: true },
     price: { type: DataTypes.FLOAT, allowNull: false },

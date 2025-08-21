@@ -5,10 +5,14 @@ const Joi = require('joi');
 // ========================
 // VALIDATION SCHEMAS
 // ========================
+
+// Allowed cover periods matching Prisma enum
+const coverPeriods = ["ONE_WEEK", "TWO_WEEKS", "ONE_MONTH", "SIX_MONTHS", "ONE_YEAR"];
+
 const searchValidationSchema = Joi.object({
   vehicleClass: Joi.string().required(),
   coverage: Joi.string().valid(...Object.values(CoverageType)).required(),
-  coverPeriod: Joi.string().required(),
+  coverPeriod: Joi.string().valid(...coverPeriods).required(),
   agentcode: Joi.string().required(),
   make: Joi.string().allow(null, ''),
   model: Joi.string().allow(null, ''),
@@ -28,7 +32,7 @@ const saveQuoteValidationSchema = Joi.object({
   yearOfManufacture: Joi.number().integer().min(1980).allow(null),
   passengers: Joi.number().integer().min(1).allow(null),
   tonnage: Joi.number().integer().min(1).allow(null),
-  coverPeriod: Joi.string().required(),
+  coverPeriod: Joi.string().valid(...coverPeriods).required(),
   coverage: Joi.string().valid(...Object.values(CoverageType)).required(),
   agentcode: Joi.string().required(),
   name_contact: Joi.string().min(3).max(100).required(),
@@ -42,7 +46,7 @@ const saveQuoteValidationSchema = Joi.object({
 // ========================
 function normalizeVehicleClass(vehicleClass, coverage) {
   if (vehicleClass === 'GENERAL_CARTAGE' && coverage === CoverageType.THIRD_PARTY_ONLY) {
-    return 'MOTORVEHICLE_OWN_GOODS';
+    return 'MOTORVEHICLE_COMMERCIAL_OWN_GOODS';
   }
   return vehicleClass;
 }
@@ -51,7 +55,7 @@ function calculateTpoPremium(vehicleClass, basePremium, tonnage, passengers) {
   switch (vehicleClass) {
     case 'MOTORVEHICLE_PRIVATE':
       return basePremium || 7500;
-    case 'MOTORVEHICLE_OWN_GOODS':
+    case 'MOTORVEHICLE_COMMERCIAL_OWN_GOODS':
     case 'GENERAL_CARTAGE':
       if (!tonnage) throw new Error('Tonnage is required for Commercial/Cartage TPO');
       return (basePremium || 7500) + Math.ceil(tonnage / 1000) * 100;

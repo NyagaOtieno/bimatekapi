@@ -33,7 +33,7 @@ model Product {
   basePremium    Float?       // Fixed premium for TPO
   premium_annual Float?       // Percentage rate for Comprehensive
   minimumPremium Float?       // Minimum allowed premium
-  coverPeriod    String?      // e.g. "1 year", "6 months"
+  coverPeriod    CoverPeriod? // ✅ use enum instead of string
   vehicleClass   VehicleClass[]
   coverage       CoverageType
   passengers     Int?         // For PSV
@@ -42,7 +42,7 @@ model Product {
   maxAge         Int?         // For Comprehensive
   minValue       Float?       // For Comprehensive
   maxValue       Float?       // For Comprehensive
-  ExcludedMakes  String[]    // Optional exclusion list
+  ExcludedMakes  String[]     // Optional exclusion list
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -51,6 +51,7 @@ model Product {
 
   @@index([coverage, agentcode, underwriterId], map: "Product_coverage_agentcode_underwriter_idx")
 }
+
 model Quote {
   id                Int          @id @default(autoincrement())
   productId         Int
@@ -68,7 +69,7 @@ model Quote {
 
   /// --- Insurance Details ---
   cover             CoverageType
-  coverPeriod       String       @db.VarChar(50)          // e.g., "Annual", "6 Months"
+  coverPeriod       CoverPeriod  // ✅ use enum instead of string
   agentCode         String       @db.VarChar(50)
   price             Decimal      @db.Decimal(10,2)
 
@@ -88,7 +89,6 @@ model Quote {
   @@index([vehicleReg])
   @@index([createdAt])
 }
-
 
 model Policy {
   id        Int     @id @default(autoincrement())
@@ -134,7 +134,7 @@ enum VehicleClass {
   TRICYCLE_OWN_GOODS
   TRICYCLE_PSV
   MOTORVEHICLE_PRIVATE
-  MOTORVEHICLE_OWN_GOODS
+  MOTORVEHICLE_COMMERCIAL_OWN_GOODS
   MOTORVEHICLE_GENERAL_CARTAGE
   MOTORVEHICLE_AGRICULTURE
   MOTORVEHICLE_CHAUFFEUR
@@ -156,4 +156,12 @@ enum CoverageType {
   THIRD_PARTY_ONLY
   THIRD_PARTY_FIRE_AND_THEFT
   COMPREHENSIVE
+}
+
+enum CoverPeriod {
+  ONE_WEEK
+  TWO_WEEKS
+  ONE_MONTH
+  SIX_MONTHS
+  ONE_YEAR
 }
