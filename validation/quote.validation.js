@@ -7,7 +7,7 @@ const vehicleClasses = [
   "TRICYCLE_OWN_GOODS",
   "TRICYCLE_PSV",
   "MOTORVEHICLE_PRIVATE",
-  "MOTORVEHICLE_OWN_GOODS",
+  "MOTORVEHICLE_COMMERCIAL_OWN_GOODS",
   "MOTORVEHICLE_GENERAL_CARTAGE",
   "MOTORVEHICLE_AGRICULTURE",
   "MOTORVEHICLE_CHAUFFEUR",
@@ -31,6 +31,14 @@ const coverageTypes = [
   'COMPREHENSIVE'
 ];
 
+const coverPeriods = [
+  'ONE_WEEK',
+  'TWO_WEEKS',
+  'ONE_MONTH',
+  'SIX_MONTHS',
+  'ONE_YEAR'
+];
+
 const quoteValidationSchema = Joi.object({
   productId: Joi.number().integer().required(),
   userId: Joi.number().integer().optional(),
@@ -50,14 +58,14 @@ const quoteValidationSchema = Joi.object({
   vehicle_reg: Joi.string().allow(null, ''),
 
   // insurance details
-  agentcode: Joi.string().required(),
+  agent_code: Joi.string().required(),   // <-- changed for consistency with model
   cover: Joi.string().valid(...coverageTypes).required(),
-  coverPeriod: Joi.string().required(),
+  coverPeriod: Joi.string().valid(...coverPeriods).required(),
 
   // contact details
   email: Joi.string().email().required(),
   name_contact: Joi.string().required(),
-  phone_number: Joi.string().required(),
+  phone_number: Joi.string().pattern(/^[0-9+\-() ]{7,20}$/).required(),
 
   // special cases
   passengers: Joi.when('vehicleClass', {
@@ -67,7 +75,7 @@ const quoteValidationSchema = Joi.object({
   }),
 
   tonnage: Joi.when('vehicleClass', {
-    is: Joi.valid("MOTORVEHICLE_OWN_GOODS", "MOTORVEHICLE_GENERAL_CARTAGE", "TANKER_LIQUID", "PRIME_MOVER"),
+    is: Joi.valid("MOTORVEHICLE_COMMERCIAL_OWN_GOODS", "MOTORVEHICLE_GENERAL_CARTAGE", "TANKER_LIQUID", "PRIME_MOVER"),
     then: Joi.number().integer().min(1).required(),
     otherwise: Joi.number().integer().allow(null)
   }),

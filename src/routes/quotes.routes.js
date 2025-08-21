@@ -11,9 +11,9 @@ const quoteController = require("../../controllers/quoteController");
 router.post(
   "/fetch",
   (req, res, next) =>
-    typeof quoteController.searchQuotes === "function"
-      ? quoteController.searchQuotes(req, res, next)
-      : res.status(500).json({ error: "searchQuotes not implemented" })
+    typeof quoteController.fetchQuote === "function"
+      ? quoteController.fetchQuote(req, res, next)
+      : res.status(500).json({ error: "fetchQuote not implemented" })
 );
 
 // Save a quote (persists to DB)
