@@ -109,7 +109,7 @@ exports.fetchQuote = async (req, res) => {
       where: {
         vehicleClass: { has: vehicleClass },
         coverage,
-        coverPeriod,
+        coverPeriod,      // must match requested coverPeriod
         agentcode,
         NOT: make ? { ExcludedMakes: { has: make } } : undefined,
       },
@@ -121,7 +121,18 @@ exports.fetchQuote = async (req, res) => {
 
     const results = products.map((product) => {
       const premium = calculatePremium(product, coverage, vehicleClass, vehicleValue, tonnage, passengers);
-      return { ...product, calculatedPremium: premium };
+      return {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        agentcode: product.agentcode,
+        vehicleClass: product.vehicleClass,
+        coverage: product.coverage,
+        coverPeriod: product.coverPeriod,
+        minimumPremium: product.minimumPremium,
+        calculatedPremium: premium,
+        underwriter: product.underwriter,
+      };
     });
 
     res.json({ message: 'Quote fetched successfully', products: results });
@@ -131,7 +142,7 @@ exports.fetchQuote = async (req, res) => {
 };
 
 // SEARCH QUOTES (alias of fetch)
-exports.searchQuotes = exports.fetchQuote;
+exports.searchQuotes = exports.fetchQuote
 
 // SAVE selected quote
 exports.createQuote = async (req, res) => {
