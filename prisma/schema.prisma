@@ -33,11 +33,11 @@ model Product {
   basePremium    Float?       // Fixed premium for TPO
   premium_annual Float?       // Percentage rate for Comprehensive
   minimumPremium Float?       // Minimum allowed premium
-  coverPeriod    CoverPeriod? // ✅ use enum instead of string
+  coverPeriod    CoverPeriod? // ✅ changed from string to enum
   vehicleClass   VehicleClass[]
   coverage       CoverageType
   passengers     Int?         // For PSV
-  tonnage        Int?         // For Commercial
+  tonnage        Int?         // For THIRD_PARTY_ONLY
   minAge         Int?         // For Comprehensive
   maxAge         Int?         // For Comprehensive
   minValue       Float?       // For Comprehensive
@@ -58,32 +58,31 @@ model Quote {
   userId            Int?
   createdAt         DateTime     @default(now())
 
-  /// --- Vehicle Information ---
-  vehicleReg        String       @unique @db.VarChar(50)   // Unique registration number
+  // --- Vehicle Information ---
+  vehicleReg        String       @unique @db.VarChar(50)
   make              String?      @db.VarChar(100)
   model             String?      @db.VarChar(100)
-  yearOfManufacture Int?         @db.SmallInt             // 4-digit year
-  value             Decimal?     @db.Decimal(12,2)        // Vehicle value
+  yearOfManufacture Int?         @db.SmallInt
+  value             Decimal?     @db.Decimal(12,2)
   tonnage           Int?         @db.SmallInt
   passengers        Int?         @db.SmallInt
 
-  /// --- Insurance Details ---
+  // --- Insurance Details ---
   cover             CoverageType
   coverPeriod       CoverPeriod  // ✅ use enum instead of string
   agentCode         String       @db.VarChar(50)
   price             Decimal      @db.Decimal(10,2)
 
-  /// --- Contact Details ---
+  // --- Contact Details ---
   contactName       String       @db.VarChar(120)
   email             String       @db.VarChar(150)
   phoneNumber       String       @db.VarChar(30)
 
-  /// --- Relations ---
+  // --- Relations ---
   policy            Policy?      @relation("QuoteToPolicy")
   product           Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
   user              User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  /// --- Indexes for Query Optimization ---
   @@index([agentCode])
   @@index([cover])
   @@index([vehicleReg])
@@ -119,7 +118,7 @@ model Claim {
   id        Int      @id @default(autoincrement())
   policyId  Int
   status    String
-  amount    Float    // Changed from Int → Float
+  amount    Float
   clientId  Int
   createdAt DateTime @default(now())
   reason    String

@@ -18,7 +18,7 @@ const productData = [
   {
     name: "Third Party Only - PSV Matatu",
     coverage: ["THIRD_PARTY_ONLY"],
-    coverPeriod: "12",
+    coverPeriod: "ONE_YEAR",
     minAge: 21,
     maxAge: 70,
     vehicleClass: ["PSV_MATATU"],
@@ -56,7 +56,7 @@ const productData = [
   {
     name: "Third Party Only - General Cartage",
     coverage: ["THIRD_PARTY_ONLY"],
-    coverPeriod: "12",
+    coverPeriod: "ONE_YEAR",
     vehicleClass: ["MOTORVEHICLE_GENERAL_CARTAGE"],
     tonnage: 5,
     ExcludedMakes: ["MERCEDES BENZ ATEGO"],
