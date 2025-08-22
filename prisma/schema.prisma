@@ -24,30 +24,35 @@ model Underwriter {
 }
 
 model Product {
-  id             Int          @id @default(autoincrement())
-  name           String
-  description    String
-  underwriterId  Int
-  underwriter    Underwriter  @relation(fields: [underwriterId], references: [id])
-  agentcode      String
-  basePremium    Float?       // Fixed premium for TPO
-  premium_annual Float?       // Percentage rate for Comprehensive
-  minimumPremium Float?       // Minimum allowed premium
-  coverPeriod    CoverPeriod? // ✅ changed from string to enum
-  vehicleClass   VehicleClass[]
-  coverage       CoverageType
-  passengers     Int?         // For PSV
-  tonnage        Int?         // For THIRD_PARTY_ONLY
-  minAge         Int?         // For Comprehensive
-  maxAge         Int?         // For Comprehensive
-  minValue       Float?       // For Comprehensive
-  maxValue       Float?       // For Comprehensive
-  ExcludedMakes  String[]     // Optional exclusion list
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id               Int            @id @default(autoincrement())
+  name             String
+  description      String
+  underwriterId    Int
+  underwriter      Underwriter    @relation(fields: [underwriterId], references: [id])
+  agentcode        String
+  basePremium      Float?         // Fixed premium for TPO
+  premium_week     Float?
+  premium_2weeks   Float?
+  premium_month    Float?
+  premium_3months  Float?
+  premium_6months  Float?
+  premium_annual   Float?         // Annual / comprehensive premium
+  minimumPremium   Float?
+  coverPeriod      CoverPeriod?
+  vehicleClass     VehicleClass[]
+  coverage         CoverageType
+  passengers       Int?           // For PSV
+  tonnage          Int?           // For THIRD_PARTY_ONLY
+  minAge           Int?           // For Comprehensive
+  maxAge           Int?
+  minValue         Float?
+  maxValue         Float?
+  ExcludedMakes    String[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
-  policies       Policy[]
-  quotes         Quote[]
+  policies         Policy[]
+  quotes           Quote[]
 
   @@index([coverage, agentcode, underwriterId], map: "Product_coverage_agentcode_underwriter_idx")
 }
@@ -58,7 +63,7 @@ model Quote {
   userId            Int?
   createdAt         DateTime     @default(now())
 
-  // --- Vehicle Information ---
+  // Vehicle Information
   vehicleReg        String       @unique @db.VarChar(50)
   make              String?      @db.VarChar(100)
   model             String?      @db.VarChar(100)
@@ -67,18 +72,18 @@ model Quote {
   tonnage           Int?         @db.SmallInt
   passengers        Int?         @db.SmallInt
 
-  // --- Insurance Details ---
+  // Insurance Details
   cover             CoverageType
-  coverPeriod       CoverPeriod  // ✅ use enum instead of string
+  coverPeriod       CoverPeriod
   agentCode         String       @db.VarChar(50)
   price             Decimal      @db.Decimal(10,2)
 
-  // --- Contact Details ---
+  // Contact Details
   contactName       String       @db.VarChar(120)
   email             String       @db.VarChar(150)
   phoneNumber       String       @db.VarChar(30)
 
-  // --- Relations ---
+  // Relations
   policy            Policy?      @relation("QuoteToPolicy")
   product           Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
   user              User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -133,7 +138,7 @@ enum VehicleClass {
   TRICYCLE_OWN_GOODS
   TRICYCLE_PSV
   MOTORVEHICLE_PRIVATE
-  MOTORVEHICLE_COMMERCIAL_OWN_GOODS
+  MOTORVEHICLE_OWN_GOODS
   MOTORVEHICLE_GENERAL_CARTAGE
   MOTORVEHICLE_AGRICULTURE
   MOTORVEHICLE_CHAUFFEUR
@@ -161,6 +166,7 @@ enum CoverPeriod {
   ONE_WEEK
   TWO_WEEKS
   ONE_MONTH
+  THREE_MONTHS
   SIX_MONTHS
   ONE_YEAR
 }

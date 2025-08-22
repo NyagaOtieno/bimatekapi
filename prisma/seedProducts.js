@@ -4,68 +4,88 @@ const prisma = new PrismaClient();
 const productData = [
   {
     name: "Comprehensive Cover - Toyota",
-    coverage: ["COMPREHENSIVE"],
-    yearOfManufacture: 2021,
-    minAge: 25,
-    maxAge: 65,
+    description: "Comprehensive insurance cover for Toyota vehicles",
+    coverage: "COMPREHENSIVE",
+    vehicleClass: ["MOTORVEHICLE_PRIVATE"],
     minValue: 500000,
     maxValue: 3000000,
     value: 1500000,
-    vehicleClass: ["MOTORVEHICLE_PRIVATE", "SEDAN"],
-    ExcludedMakes: ["LADA NIVA", "TRABANT 601", "TOYOTA PROBOX"],
     underwriterName: "AAR Insurance (Kenya) Ltd",
+    basePremium: 15000, // default base premium to calculate others if needed
+    agentcode: "31212",
   },
   {
     name: "Third Party Only - PSV Matatu",
-    coverage: ["THIRD_PARTY_ONLY"],
-    coverPeriod: "ONE_YEAR",
-    minAge: 21,
-    maxAge: 70,
+    description: "Comprehensive insurance cover for Toyota vehicles",
+    coverage: "THIRD_PARTY_ONLY",
     vehicleClass: ["PSV_MATATU"],
     passengers: 14,
-    ExcludedMakes: ["TOYOTA HIACE"],
     underwriterName: "APA Insurance Ltd",
+    basePremium: 5000,
+    agentcode: "31212",
   },
   {
     name: "Third Party Fire & Theft - Truck",
-    coverage: ["THIRD_PARTY_FIRE_AND_THEFT"],
-    yearOfManufacture: 2019,
-    minAge: 30,
-    maxAge: 60,
+    description: "Comprehensive insurance cover for Toyota vehicles",
+    coverage: "THIRD_PARTY_FIRE_AND_THEFT",
+    vehicleClass: ["MOTORVEHICLE_OWN_GOODS"],
     minValue: 800000,
     maxValue: 4000000,
-    value: 2500000,
-    vehicleClass: ["MOTORVEHICLE_OWN_GOODS"],
-    ExcludedMakes: ["TATA LPT 1213", "ISUZU ELF"],
-    tonnage: 10,
     underwriterName: "Britam General Insurance Company (K) Ltd",
-  },
-  {
-    name: "Comprehensive Cover - Luxury SUV",
-    coverage: ["COMPREHENSIVE"],
-    yearOfManufacture: 2022,
-    minAge: 28,
-    maxAge: 65,
-    minValue: 2000000,
-    maxValue: 8000000,
-    value: 5000000,
-    vehicleClass: ["MOTORVEHICLE_PRIVATE"],
-    ExcludedMakes: ["GREAT WALL HAVAL", "TOYOTA LAND CRUISER"],
-    underwriterName: "CIC General Insurance Ltd",
-  },
-  {
-    name: "Third Party Only - General Cartage",
-    coverage: ["THIRD_PARTY_ONLY"],
-    coverPeriod: "ONE_YEAR",
-    vehicleClass: ["MOTORVEHICLE_GENERAL_CARTAGE"],
-    tonnage: 5,
-    ExcludedMakes: ["MERCEDES BENZ ATEGO"],
-    underwriterName: "Directline Assurance Company Ltd",
+    basePremium: 20000,
+    agentcode: "31212",
   },
 ];
 
+// Map cover periods to premium fields
+function getCoverPeriodsAndPremiums(product) {
+  const coverage = product.coverage[0];
+  const vehicleClass = product.vehicleClass[0];
+  const base = product.basePremium || 10000;
+
+  // Initialize all premiums to null
+  const premiums = {
+    premium_week: null,
+    premium_2weeks: null,
+    premium_month: null,
+    premium_3months: null,
+    premium_6months: null,
+    premium_annual: null,
+  };
+
+  if (coverage === "COMPREHENSIVE" || coverage === "THIRD_PARTY_FIRE_AND_THEFT") {
+    premiums.premium_annual = base;
+    return { coverPeriods: ["ONE_YEAR"], premiums };
+  }
+
+  if (coverage === "THIRD_PARTY_ONLY") {
+    if (vehicleClass.includes("MOTORCYCLE_PRIVATE") || vehicleClass.includes("MOTORCYCLE_PSV")) {
+      premiums.premium_month = base;
+      premiums.premium_6months = base * 6; // example scaling
+      premiums.premium_annual = base * 12;
+      return { coverPeriods: ["ONE_MONTH", "SIX_MONTHS", "ONE_YEAR"], premiums };
+    }
+    if (vehicleClass.includes("MOTORVEHICLE_PRIVATE")) {
+      premiums.premium_month = base;
+      premiums.premium_annual = base * 12;
+      return { coverPeriods: ["ONE_MONTH", "ONE_YEAR"], premiums };
+    }
+    if (vehicleClass.includes("PSV_MATATU") || vehicleClass.includes("MATATU_BUS")) {
+      premiums.premium_week = base / 4;
+      premiums.premium_2weeks = base / 2;
+      premiums.premium_month = base;
+      premiums.premium_annual = base * 12;
+      return { coverPeriods: ["ONE_WEEK", "TWO_WEEKS", "ONE_MONTH", "ONE_YEAR"], premiums };
+    }
+  }
+
+  // Default fallback
+  premiums.premium_annual = base;
+  return { coverPeriods: ["ONE_YEAR"], premiums };
+}
+
 async function main() {
-  console.log("🌱 Seeding test products...");
+  console.log("🌱 Seeding products with cover periods and premiums...");
 
   const underwriterMap = {};
   for (const product of productData) {
@@ -79,17 +99,26 @@ async function main() {
     }
   }
 
+  let totalCount = 0;
+
   for (const product of productData) {
     const { underwriterName, ...rest } = product;
-    await prisma.product.create({
-      data: {
-        ...rest,
-        underwriterId: underwriterMap[underwriterName],
-      },
-    });
+    const { coverPeriods, premiums } = getCoverPeriodsAndPremiums(product);
+
+    for (const period of coverPeriods) {
+      await prisma.product.create({
+        data: {
+          ...rest,
+          coverPeriod: period,
+          ...premiums,
+          underwriterId: underwriterMap[underwriterName],
+        },
+      });
+      totalCount++;
+    }
   }
 
-  console.log(`✅ Seeded ${productData.length} products.`);
+  console.log(`✅ Seeded ${totalCount} products with coverPeriod and premiums.`);
 }
 
 main()

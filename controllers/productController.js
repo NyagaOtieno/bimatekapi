@@ -43,8 +43,8 @@ function validateProductRules(data) {
 
     case CoverageType.THIRD_PARTY_ONLY:
       if (!coverPeriod) throw new Error("coverPeriod is required for THIRD_PARTY_ONLY");
-      if (vehicleClass.some(vc => vc.includes("COMMERCIAL_OWN_GOODS") || vc.includes("GENERAL_CARTAGE"))) {
-        if (tonnage == null) throw new Error("tonnage is required for COMMERCIAL or GENERAL_CARTAGE vehicles");
+      if (vehicleClass.some(vc => vc.includes("OWN_GOODS") || vc.includes("GENERAL_CARTAGE"))) {
+        if (tonnage == null) throw new Error("tonnage is required for OWN_GOODS or GENERAL_CARTAGE vehicles");
       }
       if (vehicleClass.some(vc => vc.includes("PSV"))) {
         if (passengers == null) throw new Error("passengers is required for PSV vehicles");
