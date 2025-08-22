@@ -1,92 +1,121 @@
-const { PrismaClient } = require("@prisma/client");
+const { PrismaClient, VehicleClass, CoverageType, CoverPeriod } = require("@prisma/client");
 const prisma = new PrismaClient();
 
+// -------------------------------
+// Input definitions
+// -------------------------------
+const TPO_PERIODS = [
+  CoverPeriod.ONE_WEEK,
+  CoverPeriod.TWO_WEEKS,
+  CoverPeriod.ONE_MONTH,
+  CoverPeriod.SIX_MONTHS,
+  CoverPeriod.ONE_YEAR,
+];
+
+// Tonnage bands represented by upper bound ints to fit schema (Int)
+const TONNAGE_BANDS = [3, 6, 8, 10, 99]; // up to 3T, 3–6T, 6.1–8T, 8.1–10T, >10T
+
 const productData = [
+  // ---------------------------------
+  // Comprehensive (ONE_YEAR only)
+  // ---------------------------------
   {
-    name: "Comprehensive Cover - Toyota",
-    description: "Comprehensive insurance cover for Toyota vehicles",
-    coverage: "COMPREHENSIVE",
-    vehicleClass: ["MOTORVEHICLE_PRIVATE"],
+    name: "bhttdfdtdtComprehensive Motor Insurance",
+    description: "Private cars comprehensive cover",
+    coverage: CoverageType.COMPREHENSIVE,
+    vehicleClass: [VehicleClass.MOTORVEHICLE_OWN_GOODS], // kept as-is per your input
+    minAge: 0,
+    maxAge: 10,
     minValue: 500000,
-    maxValue: 3000000,
-    value: 1500000,
-    underwriterName: "AAR Insurance (Kenya) Ltd",
-    basePremium: 15000, // default base premium to calculate others if needed
+    maxValue: 5000000,
     agentcode: "31212",
+    minimumPremium: 15000, // applies only to comprehensive
+    premium_annual: 3,     // rate/percent as per your field
+    ExcludedMakes: [],
+    coverPeriod: CoverPeriod.ONE_YEAR, // ONE_YEAR only
+    underwriterName: "Takaful Insurance of Africa Ltd",
   },
+
+  // ---------------------------------
+  // TPO PSV Matatu (7–36 pax) with all TPO periods
+  // ---------------------------------
   {
     name: "Third Party Only - PSV Matatu",
-    description: "Comprehensive insurance cover for Toyota vehicles",
-    coverage: "THIRD_PARTY_ONLY",
-    vehicleClass: ["PSV_MATATU"],
-    passengers: 14,
-    underwriterName: "APA Insurance Ltd",
-    basePremium: 5000,
+    description: "Third Party Only insurance cover for Matatu",
+    coverage: CoverageType.THIRD_PARTY_ONLY,
+    vehicleClass: [VehicleClass.PSV_MATATU],
+    passengersRange: [7, 36], // exact rule: matatu starts from 7 to 36
+    ExcludedMakes: ["TOYOTA HIACE"],
     agentcode: "31212",
+    underwriterName: "APA Insurance Ltd",
   },
+
+  // ---------------------------------
+  // TPO PSV Bus (36–105 pax) with all TPO periods
+  // ---------------------------------
+  {
+    name: "Third Party Only - PSV Bus",
+    description: "Third Party Only insurance cover for Buses",
+    coverage: CoverageType.THIRD_PARTY_ONLY,
+    vehicleClass: [VehicleClass.PSV_BUS],
+    passengersRange: [36, 105], // exact rule: bus starts from 36 to 105
+    ExcludedMakes: ["ISUZU BUS"],
+    agentcode: "31212",
+    underwriterName: "APA Insurance Ltd",
+  },
+
+  // ---------------------------------
+  // TPFT Own Goods (Annual only)
+  // ---------------------------------
   {
     name: "Third Party Fire & Theft - Truck",
-    description: "Comprehensive insurance cover for Toyota vehicles",
-    coverage: "THIRD_PARTY_FIRE_AND_THEFT",
-    vehicleClass: ["MOTORVEHICLE_OWN_GOODS"],
+    description: "Third Party Fire & Theft insurance cover for trucks",
+    coverage: CoverageType.THIRD_PARTY_FIRE_AND_THEFT,
+    vehicleClass: [VehicleClass.MOTORVEHICLE_OWN_GOODS],
+    tonnage: 10, // representative tonnage for this TPFT product
+    ExcludedMakes: ["TATA LPT 1213", "ISUZU ELF"],
     minValue: 800000,
     maxValue: 4000000,
-    underwriterName: "Britam General Insurance Company (K) Ltd",
-    basePremium: 20000,
     agentcode: "31212",
+    underwriterName: "Britam General Insurance Company (K) Ltd",
+  },
+
+  // ---------------------------------
+  // TPO Own Goods (Annual only) — with tonnage bands
+  // ---------------------------------
+  {
+    name: "Third Party Only - Own Goods",
+    description: "Third Party Only insurance cover for Own Goods",
+    coverage: CoverageType.THIRD_PARTY_ONLY,
+    vehicleClass: [VehicleClass.MOTORVEHICLE_OWN_GOODS],
+    tonnageBands: TONNAGE_BANDS, // seed multiple rows (annual only)
+    ExcludedMakes: [],
+    agentcode: "31212",
+    underwriterName: "Directline Assurance Company Ltd",
+  },
+
+  // ---------------------------------
+  // TPO General Cartage (Annual only) — with tonnage bands
+  // ---------------------------------
+  {
+    name: "Third Party Only - General Cartage",
+    description: "Third Party Only insurance cover for General Cartage",
+    coverage: CoverageType.THIRD_PARTY_ONLY,
+    vehicleClass: [VehicleClass.MOTORVEHICLE_GENERAL_CARTAGE],
+    tonnageBands: TONNAGE_BANDS, // seed multiple rows (annual only)
+    ExcludedMakes: ["MERCEDES BENZ ATEGO"],
+    agentcode: "31212",
+    underwriterName: "Directline Assurance Company Ltd",
   },
 ];
 
-// Map cover periods to premium fields
-function getCoverPeriodsAndPremiums(product) {
-  const coverage = product.coverage[0];
-  const vehicleClass = product.vehicleClass[0];
-  const base = product.basePremium || 10000;
-
-  // Initialize all premiums to null
-  const premiums = {
-    premium_week: null,
-    premium_2weeks: null,
-    premium_month: null,
-    premium_3months: null,
-    premium_6months: null,
-    premium_annual: null,
-  };
-
-  if (coverage === "COMPREHENSIVE" || coverage === "THIRD_PARTY_FIRE_AND_THEFT") {
-    premiums.premium_annual = base;
-    return { coverPeriods: ["ONE_YEAR"], premiums };
-  }
-
-  if (coverage === "THIRD_PARTY_ONLY") {
-    if (vehicleClass.includes("MOTORCYCLE_PRIVATE") || vehicleClass.includes("MOTORCYCLE_PSV")) {
-      premiums.premium_month = base;
-      premiums.premium_6months = base * 6; // example scaling
-      premiums.premium_annual = base * 12;
-      return { coverPeriods: ["ONE_MONTH", "SIX_MONTHS", "ONE_YEAR"], premiums };
-    }
-    if (vehicleClass.includes("MOTORVEHICLE_PRIVATE")) {
-      premiums.premium_month = base;
-      premiums.premium_annual = base * 12;
-      return { coverPeriods: ["ONE_MONTH", "ONE_YEAR"], premiums };
-    }
-    if (vehicleClass.includes("PSV_MATATU") || vehicleClass.includes("MATATU_BUS")) {
-      premiums.premium_week = base / 4;
-      premiums.premium_2weeks = base / 2;
-      premiums.premium_month = base;
-      premiums.premium_annual = base * 12;
-      return { coverPeriods: ["ONE_WEEK", "TWO_WEEKS", "ONE_MONTH", "ONE_YEAR"], premiums };
-    }
-  }
-
-  // Default fallback
-  premiums.premium_annual = base;
-  return { coverPeriods: ["ONE_YEAR"], premiums };
-}
-
+// -------------------------------
+// Main seeding
+// -------------------------------
 async function main() {
-  console.log("🌱 Seeding products with cover periods and premiums...");
+  console.log("🌱 Seeding products...");
 
+  // Map/Upsert underwriters once
   const underwriterMap = {};
   for (const product of productData) {
     if (!underwriterMap[product.underwriterName]) {
@@ -99,26 +128,80 @@ async function main() {
     }
   }
 
-  let totalCount = 0;
+  let count = 0;
 
   for (const product of productData) {
-    const { underwriterName, ...rest } = product;
-    const { coverPeriods, premiums } = getCoverPeriodsAndPremiums(product);
+    const {
+      underwriterName,
+      passengersRange,
+      tonnage,
+      tonnageBands,
+      minimumPremium,
+      coverPeriod, // only used for Comprehensive
+      ...rest
+    } = product;
 
-    for (const period of coverPeriods) {
+    // COMPREHENSIVE => ONE_YEAR only + minimumPremium applies
+    if (product.coverage === CoverageType.COMPREHENSIVE) {
       await prisma.product.create({
         data: {
           ...rest,
-          coverPeriod: period,
-          ...premiums,
+          minimumPremium,
+          coverPeriod,
           underwriterId: underwriterMap[underwriterName],
         },
       });
-      totalCount++;
+      count += 1;
+      continue;
     }
+
+    // PSV Matatu/Bus => TPO across all periods × passenger range
+    if (passengersRange) {
+      for (const period of TPO_PERIODS) {
+        for (let pax = passengersRange[0]; pax <= passengersRange[1]; pax++) {
+          await prisma.product.create({
+            data: {
+              ...rest,
+              passengers: pax,
+              coverPeriod: period,
+              underwriterId: underwriterMap[underwriterName],
+            },
+          });
+          count += 1;
+        }
+      }
+      continue;
+    }
+
+    // TPO Own Goods / General Cartage (annual only) => seed multiple tonnage bands
+    if (tonnageBands && Array.isArray(tonnageBands)) {
+      for (const tUpper of tonnageBands) {
+        await prisma.product.create({
+          data: {
+            ...rest,
+            tonnage: tUpper, // store upper-bound int for the range
+            coverPeriod: CoverPeriod.ONE_YEAR,
+            underwriterId: underwriterMap[underwriterName],
+          },
+        });
+        count += 1;
+      }
+      continue;
+    }
+
+    // TPFT or other TPO items without passengersRange/tonnageBands => annual only
+    await prisma.product.create({
+      data: {
+        ...rest,
+        tonnage: typeof tonnage === "number" ? tonnage : null,
+        coverPeriod: CoverPeriod.ONE_YEAR,
+        underwriterId: underwriterMap[underwriterName],
+      },
+    });
+    count += 1;
   }
 
-  console.log(`✅ Seeded ${totalCount} products with coverPeriod and premiums.`);
+  console.log(`✅ Seeded ${count} product rows (cover periods, passengers, tonnage bands all applied).`);
 }
 
 main()
