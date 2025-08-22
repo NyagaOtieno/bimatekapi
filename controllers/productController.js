@@ -60,13 +60,13 @@ function validateProductRules(data) {
  * Check for duplicate product
  */
 async function checkDuplicateProduct(validatedData, underwriterId, excludeId = null) {
-  const coverageEnum = normalizeCoverage(validatedData.coverage); // normalized to Prisma enum
+  const coverageEnum = normalizeCoverage(validatedData.coverage); 
 
   return prisma.product.findFirst({
     where: {
       underwriterId,
       agentcode: validatedData.agentcode,
-      coverage: coverageEnum, // ✅ pass as single enum value
+      coverage: coverageEnum,
       vehicleClass: { hasSome: validatedData.vehicleClass },
       minAge: validatedData.minAge ?? null,
       maxAge: validatedData.maxAge ?? null,
@@ -107,6 +107,7 @@ exports.createProduct = async (req, res) => {
       data: {
         ...validatedData,
         underwriter: { connect: { id: underwriter.id } },
+        underwriterName: underwriter.name, // ✅ Save readable name
         minimumPremium: coverage === CoverageType.COMPREHENSIVE ? validatedData.minimumPremium : null,
       },
     });
@@ -155,11 +156,13 @@ exports.updateProduct = async (req, res) => {
 
     let underwriterData = {};
     let underwriterId;
+    let underwriterName;
     if (validatedData.underwriter) {
       const underwriter = await prisma.underwriter.findUnique({ where: { name: validatedData.underwriter } });
       if (!underwriter) return res.status(400).json({ message: `Underwriter '${validatedData.underwriter}' not found` });
       underwriterData = { underwriter: { connect: { id: underwriter.id } } };
       underwriterId = underwriter.id;
+      underwriterName = underwriter.name;
     }
 
     const duplicate = await checkDuplicateProduct(validatedData, underwriterId, id);
@@ -172,6 +175,7 @@ exports.updateProduct = async (req, res) => {
       data: {
         ...validatedData,
         ...underwriterData,
+        underwriterName, // ✅ Save readable name
         minimumPremium: coverage === CoverageType.COMPREHENSIVE ? validatedData.minimumPremium : null,
       },
     });

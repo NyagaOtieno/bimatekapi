@@ -29,6 +29,7 @@ model Product {
   description      String
   underwriterId    Int
   underwriter      Underwriter    @relation(fields: [underwriterId], references: [id])
+   underwriterName String?   // <-- make it optional
   agentcode        String
   basePremium      Float?         // Fixed premium for TPO
   premium_week     Float?
@@ -55,7 +56,9 @@ model Product {
   quotes           Quote[]
 
   @@index([coverage, agentcode, underwriterId], map: "Product_coverage_agentcode_underwriter_idx")
+  @@index([underwriterName], map: "Product_underwriterName_idx") // ✅ faster lookups by name
 }
+
 
 model Quote {
   id                Int          @id @default(autoincrement())
