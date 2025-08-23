@@ -69,16 +69,18 @@ exports.fetchQuote = async (req, res) => {
     const coverPeriodEnum = CoverPeriod[coverPeriod];
 
     // ========================
-    // STRICT DB FILTER
+    // STRICT DB FILTER (apply optional filters only if they exist)
     // ========================
     const where = {
       vehicleClass: { has: vehicleClass },
       coverage,
       agentcode,
       coverPeriod: coverPeriodEnum,
-      minimumPremium: vehicleValue ? { lte: vehicleValue } : undefined,
-      minAge: yearOfManufacture ? { lte: new Date().getFullYear() - yearOfManufacture } : undefined,
-      maxAge: yearOfManufacture ? { gte: new Date().getFullYear() - yearOfManufacture } : undefined,
+      ...(vehicleValue ? { minimumPremium: { lte: vehicleValue } } : {}),
+      ...(yearOfManufacture ? {
+        minAge: { lte: new Date().getFullYear() - yearOfManufacture },
+        maxAge: { gte: new Date().getFullYear() - yearOfManufacture }
+      } : {})
     };
 
     let products = await prisma.product.findMany({
