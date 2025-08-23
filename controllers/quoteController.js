@@ -100,7 +100,7 @@ exports.fetchQuote = async (req, res) => {
     };
 
     if (coverPeriod) where.coverPeriod = coverPeriodEnum;
-    if (make) where.ExcludedMakes = { not: { has: make } };
+    if (make) where.ExcludedMakes = { none: make }; // ✅ fixed for Prisma v6
     if (vehicleValue) where.minimumPremium = { lte: vehicleValue };
     if (yearOfManufacture) {
       const age = new Date().getFullYear() - yearOfManufacture;
