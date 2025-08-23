@@ -46,10 +46,8 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue, passenge
 function checkEligibility(product, filters) {
   const { vehicleValue, vehicleAge, tonnage, agentCode, make } = filters;
 
-  // Agent code check (optional)
   if (product.agentcode && agentCode && product.agentcode !== agentCode) return false;
 
-  // Vehicle value range
   if (vehicleValue != null) {
     if ((product.minValue != null && vehicleValue < product.minValue) ||
         (product.maxValue != null && vehicleValue > product.maxValue)) {
@@ -57,7 +55,6 @@ function checkEligibility(product, filters) {
     }
   }
 
-  // Vehicle age
   if (vehicleAge != null) {
     if ((product.minAge != null && vehicleAge < product.minAge) ||
         (product.maxAge != null && vehicleAge > product.maxAge)) {
@@ -65,7 +62,6 @@ function checkEligibility(product, filters) {
     }
   }
 
-  // Tonnage checks
   if ((product.vehicleClass.includes("MOTORVEHICLE_OWN_GOODS") ||
        product.vehicleClass.includes("MOTORVEHICLE_GENERAL_CARTAGE")) &&
       tonnage != null) {
@@ -75,7 +71,6 @@ function checkEligibility(product, filters) {
     }
   }
 
-  // Make exclusion
   if (make && product.excludedMakes && product.excludedMakes.includes(make.toUpperCase())) {
     return false;
   }
@@ -108,7 +103,6 @@ exports.fetchQuote = async (req, res) => {
       return res.status(400).json({ message: "vehicleClass and coverage are required" });
     }
 
-    // Calculate vehicle age if yearOfManufacture is provided
     const vehicleAge = yearOfManufacture ? new Date().getFullYear() - yearOfManufacture : null;
 
     const products = await prisma.product.findMany({
@@ -119,10 +113,16 @@ exports.fetchQuote = async (req, res) => {
       include: { underwriter: true },
     });
 
+    console.log("Products fetched:", products.length);
+
     if (!products.length) return res.status(404).json({ message: "No matching product found" });
 
     const quotes = products
-      .filter((product) => checkEligibility(product, { vehicleValue, vehicleAge, tonnage, agentCode, make }))
+      .filter((product) => {
+        const eligible = checkEligibility(product, { vehicleValue, vehicleAge, tonnage, agentCode, make });
+        if (!eligible) console.log(`Product ${product.name} not eligible`);
+        return eligible;
+      })
       .map((product) => {
         const premium = calculatePremium(product, coverage, coverPeriod, vehicleValue, passengers);
 
