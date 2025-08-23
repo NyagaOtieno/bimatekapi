@@ -2,9 +2,6 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
-// ========================
-// COVER PERIOD → PREMIUM FIELD MAP
-// ========================
 const COVER_PERIOD_MAP = {
   WEEK: "premium_week",
   TWO_WEEKS: "premium_2weeks",
@@ -14,27 +11,21 @@ const COVER_PERIOD_MAP = {
   ANNUAL: "premium_annual",
 };
 
-// ========================
-// Helpers
-// ========================
 function normalize(str) {
-  if (!str) return null;
-  return str.toUpperCase().replace(/\s+/g, "_");
+  return str ? str.toUpperCase().replace(/\s+/g, "_") : null;
 }
 
+// ========================
+// Premium Calculation
+// ========================
 function calculatePremium(product, coverage, coverPeriod, vehicleValue) {
   let premium = null;
 
   if (coverage === "COMPREHENSIVE") {
-    if (!vehicleValue) {
-      throw new Error("vehicleValue is required for COMPREHENSIVE cover");
-    }
-
-    // Premium = rate × value, enforce minimumPremium
+    if (!vehicleValue) return null;
     const calcPremium = (vehicleValue * (product.rate || 0)) / 100;
     premium = Math.max(calcPremium, product.minimumPremium || 0);
   } else {
-    // Third party → select fixed premium from DB
     const premiumField = COVER_PERIOD_MAP[coverPeriod];
     premium = premiumField ? product[premiumField] : product.basePremium;
   }
@@ -43,13 +34,89 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue) {
 }
 
 // ========================
+// Eligibility Check
+// ========================
+function checkEligibility(product, filters) {
+  const {
+    vehicleValue,
+    vehicleAge,
+    tonnage,
+    passengers,
+    agentCode,
+  } = filters;
+
+  // ✅ Agent check
+  if (product.agentCode && agentCode && product.agentCode !== agentCode) {
+    return false;
+  }
+
+  // ✅ Vehicle value range
+  if (vehicleValue) {
+    if (
+      (product.minValue && vehicleValue < product.minValue) ||
+      (product.maxValue && vehicleValue > product.maxValue)
+    ) {
+      return false;
+    }
+  }
+
+  // ✅ Vehicle age
+  if (vehicleAge) {
+    if (
+      (product.minAge && vehicleAge < product.minAge) ||
+      (product.maxAge && vehicleAge > product.maxAge)
+    ) {
+      return false;
+    }
+  }
+
+  // ✅ Tonnage checks for OWN GOODS / GENERAL CARTAGE
+  if (
+    product.vehicleClass.includes("MOTORVEHICLE_OWN_GOODS") ||
+    product.vehicleClass.includes("MOTORVEHICLE_GENERAL_CARTAGE")
+  ) {
+    if (
+      tonnage &&
+      ((product.minTonnage && tonnage < product.minTonnage) ||
+        (product.maxTonnage && tonnage > product.maxTonnage))
+    ) {
+      return false;
+    }
+  }
+
+  // ✅ Passenger capacity checks for PSV
+  if (
+    product.vehicleClass.includes("PSV_MATATU") ||
+    product.vehicleClass.includes("PSV_BUS")
+  ) {
+    if (
+      passengers &&
+      ((product.minPassengers && passengers < product.minPassengers) ||
+        (product.maxPassengers && passengers > product.maxPassengers))
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// ========================
 // Fetch Quote Controller
 // ========================
 exports.fetchQuote = async (req, res) => {
   try {
-    let { vehicleClass, coverage, coverPeriod, vehicleValue } = req.body;
+    let {
+      vehicleClass,
+      coverage,
+      coverPeriod,
+      vehicleValue,
+      vehicleAge,
+      tonnage,
+      passengers,
+      agentCode,
+    } = req.body;
 
-    // Normalize inputs
     vehicleClass = normalize(vehicleClass);
     coverage = normalize(coverage);
     coverPeriod = coverPeriod ? normalize(coverPeriod) : null;
@@ -60,11 +127,11 @@ exports.fetchQuote = async (req, res) => {
       });
     }
 
-    // Fetch all matching products
+    // Fetch candidate products
     const products = await prisma.product.findMany({
       where: {
         vehicleClass: { has: vehicleClass },
-        coverage: coverage,
+        coverage,
       },
       include: { underwriter: true },
     });
@@ -73,28 +140,42 @@ exports.fetchQuote = async (req, res) => {
       return res.status(404).json({ message: "No matching product found" });
     }
 
-    // Compute premium for each product
-    const quotes = products.map((product) => {
-      let premium = null;
+    // Filter by eligibility and calculate premium
+    const quotes = products
+      .filter((product) =>
+        checkEligibility(product, {
+          vehicleValue,
+          vehicleAge,
+          tonnage,
+          passengers,
+          agentCode,
+        })
+      )
+      .map((product) => {
+        const premium = calculatePremium(
+          product,
+          coverage,
+          coverPeriod,
+          vehicleValue
+        );
 
-      try {
-        premium = calculatePremium(product, coverage, coverPeriod, vehicleValue);
-      } catch (err) {
-        premium = null; // skip if invalid (e.g., missing vehicleValue)
-      }
+        return {
+          productId: product.id,
+          productName: product.name,
+          underwriter: product.underwriter?.name || "Unknown",
+          vehicleClass,
+          coverage,
+          coverPeriod: coverPeriod || "BASE",
+          rate: product.rate,
+          minimumPremium: product.minimumPremium,
+          premium,
+        };
+      })
+      .filter((q) => q.premium !== null); // drop invalid premiums
 
-      return {
-        productId: product.id,
-        productName: product.name,
-        underwriter: product.underwriter?.name || "Unknown",
-        vehicleClass,
-        coverage,
-        coverPeriod: coverPeriod || "BASE",
-        rate: product.rate,
-        minimumPremium: product.minimumPremium,
-        premium,
-      };
-    });
+    if (quotes.length === 0) {
+      return res.status(404).json({ message: "No eligible product found" });
+    }
 
     return res.json({
       message: "Quotes fetched successfully",
