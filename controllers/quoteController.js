@@ -8,28 +8,33 @@ exports.fetchQuote = async (req, res) => {
 
     const { vehicleClass, coverage, coverPeriod, value } = req.body;
 
-    // Normalize strings to match enum format
+    // Normalize inputs
     const normalizedVehicleClass = vehicleClass?.toUpperCase().replace(/\s+/g, "_");
     const normalizedCoverage = coverage?.toUpperCase().replace(/\s+/g, "_");
     const normalizedCoverPeriod = coverPeriod?.toUpperCase().replace(/\s+/g, "_");
 
+    // ✅ Convert to Prisma enums
+    const enumVehicleClass = VehicleClass[normalizedVehicleClass];
+    const enumCoverage = CoverageType[normalizedCoverage];
+    const enumCoverPeriod = CoverPeriod[normalizedCoverPeriod];
+
     // Validate enums
-    if (!Object.values(VehicleClass).includes(normalizedVehicleClass)) {
+    if (!enumVehicleClass) {
       return res.status(400).json({ message: `Invalid vehicleClass: ${vehicleClass}` });
     }
-    if (!Object.values(CoverageType).includes(normalizedCoverage)) {
+    if (!enumCoverage) {
       return res.status(400).json({ message: `Invalid coverage: ${coverage}` });
     }
-    if (!Object.values(CoverPeriod).includes(normalizedCoverPeriod)) {
+    if (!enumCoverPeriod) {
       return res.status(400).json({ message: `Invalid coverPeriod: ${coverPeriod}` });
     }
 
     // ✅ Query: vehicleClass is an array → use `has`
     const products = await prisma.product.findMany({
       where: {
-        vehicleClass: { has: normalizedVehicleClass }, // ✅ array contains enum
-        coverage: normalizedCoverage,
-        coverPeriod: normalizedCoverPeriod,
+        vehicleClass: { has: enumVehicleClass }, // enum array
+        coverage: enumCoverage,                  // enum
+        coverPeriod: enumCoverPeriod,            // enum
       },
       include: { underwriter: true },
     });
@@ -37,7 +42,7 @@ exports.fetchQuote = async (req, res) => {
     console.log("🔍 Products found:", products.length);
 
     if (!products.length) {
-      // Helpful debug log
+      // Debugging: log all products
       const allProducts = await prisma.product.findMany({
         select: { id: true, vehicleClass: true, coverage: true, coverPeriod: true },
       });
@@ -49,7 +54,8 @@ exports.fetchQuote = async (req, res) => {
     // Example premium calculation
     const product = products[0];
     let premium = Math.max(product.basePremium ?? 0, product.minimumPremium ?? 15000);
-    if (value && product.coverage === "COMPREHENSIVE") {
+
+    if (value && product.coverage === CoverageType.COMPREHENSIVE) {
       premium = Math.max(premium, value * 0.05);
     }
 
