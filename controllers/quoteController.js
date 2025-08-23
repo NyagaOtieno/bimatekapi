@@ -1,78 +1,88 @@
 // controllers/quoteController.js
-const { PrismaClient, VehicleClass, CoverageType, CoverPeriod } = require("@prisma/client");
+const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
+// ========================
+// COVER PERIOD → PREMIUM MAP
+// ========================
+const COVER_PERIOD_MAP = {
+  WEEK: "premium_week",
+  TWO_WEEKS: "premium_2weeks",
+  MONTH: "premium_month",
+  THREE_MONTHS: "premium_3months",
+  SIX_MONTHS: "premium_6months",
+  ANNUAL: "premium_annual",
+};
+
+// ========================
+// Helper: normalize strings
+// ========================
+function normalize(str) {
+  if (!str) return null;
+  return str.toUpperCase().replace(/\s+/g, "_");
+}
+
+// ========================
+// Fetch Quote
+// ========================
 exports.fetchQuote = async (req, res) => {
   try {
-    console.log("👉 Incoming request body:", req.body);
-
-    const { vehicleClass, coverage, coverPeriod, value } = req.body;
+    let { vehicleClass, coverage, coverPeriod } = req.body;
 
     // Normalize inputs
-    const normalizedVehicleClass = vehicleClass?.toUpperCase().replace(/\s+/g, "_");
-    const normalizedCoverage = coverage?.toUpperCase().replace(/\s+/g, "_");
-    const normalizedCoverPeriod = coverPeriod?.toUpperCase().replace(/\s+/g, "_");
+    vehicleClass = normalize(vehicleClass);
+    coverage = normalize(coverage);
+    coverPeriod = coverPeriod ? normalize(coverPeriod) : null;
 
-    // ✅ Convert to Prisma enums
-    const enumVehicleClass = VehicleClass[normalizedVehicleClass];
-    const enumCoverage = CoverageType[normalizedCoverage];
-    const enumCoverPeriod = CoverPeriod[normalizedCoverPeriod];
-
-    // Validate enums
-    if (!enumVehicleClass) {
-      return res.status(400).json({ message: `Invalid vehicleClass: ${vehicleClass}` });
-    }
-    if (!enumCoverage) {
-      return res.status(400).json({ message: `Invalid coverage: ${coverage}` });
-    }
-    if (!enumCoverPeriod) {
-      return res.status(400).json({ message: `Invalid coverPeriod: ${coverPeriod}` });
+    if (!vehicleClass || !coverage) {
+      return res.status(400).json({
+        message: "vehicleClass and coverage are required",
+      });
     }
 
-    // ✅ Query: vehicleClass is an array → use `has`
-    const products = await prisma.product.findMany({
+    // Fetch matching product
+    const product = await prisma.product.findFirst({
       where: {
-        vehicleClass: { has: enumVehicleClass }, // enum array
-        coverage: enumCoverage,                  // enum
-        coverPeriod: enumCoverPeriod,            // enum
+        vehicleClass: {
+          has: vehicleClass, // vehicleClass is stored as array[]
+        },
+        coverage: coverage,
       },
-      include: { underwriter: true },
     });
 
-    console.log("🔍 Products found:", products.length);
-
-    if (!products.length) {
-      // Debugging: log all products
-      const allProducts = await prisma.product.findMany({
-        select: { id: true, vehicleClass: true, coverage: true, coverPeriod: true },
-      });
-      console.log("📦 All products in DB:", allProducts);
-
+    if (!product) {
       return res.status(404).json({ message: "No matching product found" });
     }
 
-    // Example premium calculation
-    const product = products[0];
-    let premium = Math.max(product.basePremium ?? 0, product.minimumPremium ?? 15000);
+    // ========================
+    // Determine premium
+    // ========================
+    let selectedPremium = null;
 
-    if (value && product.coverage === CoverageType.COMPREHENSIVE) {
-      premium = Math.max(premium, value * 0.05);
+    if (coverPeriod) {
+      const premiumField = COVER_PERIOD_MAP[coverPeriod];
+      if (premiumField && product[premiumField] != null) {
+        selectedPremium = product[premiumField];
+      }
+    }
+
+    // If no coverPeriod provided, or premium not found → fallback to basePremium
+    if (!selectedPremium) {
+      selectedPremium = product.basePremium || null;
     }
 
     return res.json({
       message: "Quote fetched successfully",
-      product: {
-        id: product.id,
-        name: product.name,
-        coverage: product.coverage,
-        vehicleClass: product.vehicleClass,
-        coverPeriod: product.coverPeriod,
-        premium,
-        underwriter: product.underwriter,
+      data: {
+        productId: product.id,
+        vehicleClass,
+        coverage,
+        coverPeriod: coverPeriod || "BASE",
+        premium: selectedPremium,
       },
     });
   } catch (err) {
-    console.error("❌ Error fetching quote:", err);
-    res.status(500).json({ message: "Server error", error: err.message });
+    console.error("Error fetching quote:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
