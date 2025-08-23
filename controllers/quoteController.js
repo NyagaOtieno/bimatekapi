@@ -32,44 +32,24 @@ function normalizeVehicleClass(vehicleClass, coverage) {
   return vehicleClass;
 }
 
-// Select premium based on coverPeriod
 function getPremiumForPeriod(product, coverPeriod) {
   switch (coverPeriod) {
-    case CoverPeriod.ONE_WEEK:
-      return product.premium_week ?? product.minimumPremium ?? 0;
-    case CoverPeriod.TWO_WEEKS:
-      return product.premium_2weeks ?? product.minimumPremium ?? 0;
-    case CoverPeriod.ONE_MONTH:
-      return product.premium_month ?? product.minimumPremium ?? 0;
-    case CoverPeriod.THREE_MONTHS:
-      return product.premium_3months ?? product.minimumPremium ?? 0;
-    case CoverPeriod.SIX_MONTHS:
-      return product.premium_6months ?? product.minimumPremium ?? 0;
-    case CoverPeriod.ONE_YEAR:
-      return product.premium_annual ?? product.minimumPremium ?? 0;
-    default:
-      return product.minimumPremium ?? 0;
+    case CoverPeriod.ONE_WEEK: return product.premium_week ?? product.minimumPremium ?? 0;
+    case CoverPeriod.TWO_WEEKS: return product.premium_2weeks ?? product.minimumPremium ?? 0;
+    case CoverPeriod.ONE_MONTH: return product.premium_month ?? product.minimumPremium ?? 0;
+    case CoverPeriod.THREE_MONTHS: return product.premium_3months ?? product.minimumPremium ?? 0;
+    case CoverPeriod.SIX_MONTHS: return product.premium_6months ?? product.minimumPremium ?? 0;
+    case CoverPeriod.ONE_YEAR: return product.premium_annual ?? product.minimumPremium ?? 0;
+    default: return product.minimumPremium ?? 0;
   }
 }
 
-// Additional adjustments for PSV and commercial vehicles
 function calculatePremium(product, vehicleClass, vehicleValue, tonnage, passengers, coverPeriod) {
   let premium = getPremiumForPeriod(product, coverPeriod);
 
-  // PSV: if passengers exceed product.maxSeats, reject (front end will see no match)
-  if (vehicleClass.includes("PSV") && passengers && product.maxSeats) {
-    if (passengers > product.maxSeats) return null;
-  }
-
-  // Commercial/Own Goods: tonnage limit
-  if ((vehicleClass.includes("OWN_GOODS") || vehicleClass.includes("GENERAL_CARTAGE")) && tonnage && product.tonnage) {
-    if (tonnage > product.tonnage) return null;
-  }
-
-  // Comprehensive: apply 5% of value if higher than minimumPremium
-  if (product.coverage === CoverageType.COMPREHENSIVE && vehicleValue) {
-    premium = Math.max(premium, vehicleValue * 0.05);
-  }
+  if (vehicleClass.includes("PSV") && passengers && product.maxSeats && passengers > product.maxSeats) return null;
+  if ((vehicleClass.includes("OWN_GOODS") || vehicleClass.includes("GENERAL_CARTAGE")) && tonnage && product.tonnage && tonnage > product.tonnage) return null;
+  if (product.coverage === CoverageType.COMPREHENSIVE && vehicleValue) premium = Math.max(premium, vehicleValue * 0.05);
 
   return premium;
 }
@@ -85,60 +65,50 @@ exports.fetchQuote = async (req, res) => {
     let { vehicleClass, coverage, coverPeriod, agentcode, make, value: vehicleValue, passengers, tonnage, yearOfManufacture } = value;
     vehicleClass = normalizeVehicleClass(vehicleClass, coverage);
 
-    if (!CoverPeriod[coverPeriod]) {
-      return res.status(400).json({ message: 'Invalid coverPeriod value' });
-    }
+    if (!CoverPeriod[coverPeriod]) return res.status(400).json({ message: 'Invalid coverPeriod value' });
     const coverPeriodEnum = CoverPeriod[coverPeriod];
 
     // ========================
-    // STRICT DB FILTER BASED ON BODY
+    // STRICT DB FILTER
     // ========================
     const where = {
       vehicleClass: { has: vehicleClass },
       coverage,
       agentcode,
+      coverPeriod: coverPeriodEnum,
+      minimumPremium: vehicleValue ? { lte: vehicleValue } : undefined,
+      minAge: yearOfManufacture ? { lte: new Date().getFullYear() - yearOfManufacture } : undefined,
+      maxAge: yearOfManufacture ? { gte: new Date().getFullYear() - yearOfManufacture } : undefined,
     };
-
-    if (coverPeriod) where.coverPeriod = coverPeriodEnum;
-    if (make) where.ExcludedMakes = { none: make }; // ✅ fixed for Prisma v6
-    if (vehicleValue) where.minimumPremium = { lte: vehicleValue };
-    if (yearOfManufacture) {
-      const age = new Date().getFullYear() - yearOfManufacture;
-      where.minAge = { lte: age };
-      where.maxAge = { gte: age };
-    }
 
     let products = await prisma.product.findMany({
       where,
       include: { underwriter: true },
     });
 
-    // Apply business rules filtering (unchanged)
+    // Exclude makes in JS (Prisma v6 safe)
+    if (make) products = products.filter(p => !p.ExcludedMakes?.includes(make));
+
+    // Business rules filtering
     products = products.filter(product => {
       if (vehicleClass.includes("PSV") && passengers) {
         if (product.minSeats && passengers < product.minSeats) return false;
         if (product.maxSeats && passengers > product.maxSeats) return false;
       }
-
       if ((vehicleClass.includes("OWN_GOODS") || vehicleClass.includes("GENERAL_CARTAGE")) && tonnage) {
         if (product.tonnage && tonnage > product.tonnage) return false;
       }
-
       if (yearOfManufacture && product.minAge && product.maxAge) {
         const age = new Date().getFullYear() - yearOfManufacture;
         if (age < product.minAge || age > product.maxAge) return false;
       }
-
       if (vehicleValue && product.minValue && product.maxValue) {
         if (vehicleValue < product.minValue || vehicleValue > product.maxValue) return false;
       }
-
       return true;
     });
 
-    if (!products.length) {
-      return res.status(404).json({ message: 'No matching product found' });
-    }
+    if (!products.length) return res.status(404).json({ message: 'No matching product found' });
 
     const results = products.map(product => {
       const premium = calculatePremium(product, vehicleClass, vehicleValue, tonnage, passengers, coverPeriodEnum);
@@ -153,16 +123,11 @@ exports.fetchQuote = async (req, res) => {
         coverPeriod: product.coverPeriod,
         minimumPremium: product.minimumPremium,
         calculatedPremium: premium,
-        underwriter: {
-          id: product.underwriter.id,
-          name: product.underwriter.name,
-        },
+        underwriter: { id: product.underwriter.id, name: product.underwriter.name },
       };
     }).filter(Boolean);
 
-    if (!results.length) {
-      return res.status(404).json({ message: 'No matching product found after business rules check' });
-    }
+    if (!results.length) return res.status(404).json({ message: 'No matching product found after business rules check' });
 
     res.json({ message: 'Quote fetched successfully', products: results });
   } catch (err) {
