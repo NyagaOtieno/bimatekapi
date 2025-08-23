@@ -90,37 +90,45 @@ exports.fetchQuote = async (req, res) => {
     }
     const coverPeriodEnum = CoverPeriod[coverPeriod];
 
-    // Initial DB query: broad filter
+    // ========================
+    // STRICT DB FILTER BASED ON BODY
+    // ========================
+    const where = {
+      vehicleClass: { has: vehicleClass },
+      coverage,
+      agentcode,
+    };
+
+    if (coverPeriod) where.coverPeriod = coverPeriodEnum;
+    if (make) where.ExcludedMakes = { not: { has: make } };
+    if (vehicleValue) where.minimumPremium = { lte: vehicleValue };
+    if (yearOfManufacture) {
+      const age = new Date().getFullYear() - yearOfManufacture;
+      where.minAge = { lte: age };
+      where.maxAge = { gte: age };
+    }
+
     let products = await prisma.product.findMany({
-      where: {
-        vehicleClass: { has: vehicleClass },
-        coverage,
-        agentcode,
-        NOT: make ? { ExcludedMakes: { has: make } } : undefined,
-      },
+      where,
       include: { underwriter: true },
     });
 
-    // Apply business rules filtering
+    // Apply business rules filtering (unchanged)
     products = products.filter(product => {
-      // PSV seats filter
       if (vehicleClass.includes("PSV") && passengers) {
         if (product.minSeats && passengers < product.minSeats) return false;
         if (product.maxSeats && passengers > product.maxSeats) return false;
       }
 
-      // Commercial/Own Goods tonnage filter
       if ((vehicleClass.includes("OWN_GOODS") || vehicleClass.includes("GENERAL_CARTAGE")) && tonnage) {
         if (product.tonnage && tonnage > product.tonnage) return false;
       }
 
-      // Age filter (yearOfManufacture)
       if (yearOfManufacture && product.minAge && product.maxAge) {
         const age = new Date().getFullYear() - yearOfManufacture;
         if (age < product.minAge || age > product.maxAge) return false;
       }
 
-      // Vehicle value filter
       if (vehicleValue && product.minValue && product.maxValue) {
         if (vehicleValue < product.minValue || vehicleValue > product.maxValue) return false;
       }
@@ -134,7 +142,7 @@ exports.fetchQuote = async (req, res) => {
 
     const results = products.map(product => {
       const premium = calculatePremium(product, vehicleClass, vehicleValue, tonnage, passengers, coverPeriodEnum);
-      if (premium === null) return null; // skip if premium calculation fails due to seats/tonnage
+      if (premium === null) return null;
       return {
         id: product.id,
         name: product.name,
