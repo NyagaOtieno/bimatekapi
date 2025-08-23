@@ -29,26 +29,39 @@ model Product {
   description      String
   underwriterId    Int
   underwriter      Underwriter    @relation(fields: [underwriterId], references: [id])
-   underwriterName String?   // <-- make it optional
+  underwriterName  String         @default("UNKNOWN") 
   agentcode        String
-  basePremium      Float?         // Fixed premium for TPO
+
+  // Premium structure
+  basePremium      Float?         // Fixed premium (mainly TPO / base)
   premium_week     Float?
   premium_2weeks   Float?
   premium_month    Float?
   premium_3months  Float?
   premium_6months  Float?
-  premium_annual   Float?         // Annual / comprehensive premium
+  premium_annual   Float?
   minimumPremium   Float?
-  coverPeriod      CoverPeriod?
+
+  // Risk definitions
+  coverPeriod      CoverPeriod?   // period supported (one of enum)
   vehicleClass     VehicleClass[]
   coverage         CoverageType
-  passengers       Int?           // For PSV
-  tonnage          Int?           // For THIRD_PARTY_ONLY
-  minAge           Int?           // For Comprehensive
+
+  // PSV-specific (fixed seat capacity band)
+  minSeats         Int?           // e.g. 7
+  maxSeats         Int?           // e.g. 36 for matatus, 105 for buses
+
+  // Goods/commercial-specific
+  tonnage          Int?
+
+  // Comprehensive-specific
+  minAge           Int?           
   maxAge           Int?
   minValue         Float?
   maxValue         Float?
+
   ExcludedMakes    String[]
+
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
@@ -56,9 +69,8 @@ model Product {
   quotes           Quote[]
 
   @@index([coverage, agentcode, underwriterId], map: "Product_coverage_agentcode_underwriter_idx")
-  @@index([underwriterName], map: "Product_underwriterName_idx") // ✅ faster lookups by name
+  @@index([underwriterName], map: "Product_underwriterName_idx")
 }
-
 
 model Quote {
   id                Int          @id @default(autoincrement())

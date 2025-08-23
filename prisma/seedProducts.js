@@ -201,7 +201,7 @@ async function main() {
     count += 1;
   }
 
-  console.log(`✅ Seeded ${count} product rows (cover periods, passengers, tonnage bands all applied).`);
+  console.log('✅ Seeded ${count} product rows (cover periods, passengers, tonnage bands all applied).');
 }
 
 main()

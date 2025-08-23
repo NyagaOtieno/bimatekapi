@@ -44,54 +44,126 @@ async function main() {
 
   console.log("✅ Underwriters seeded successfully");
 
-  // 2. Seed one sample product (linked to APA Insurance Ltd)
-  const apa = await prisma.underwriter.findUnique({
-    where: { name: "APA Insurance Ltd" },
-  });
+  // 2. Seed sample products
+  const products = [
+    {
+      underwriterName: "APA Insurance Ltd",
+      name: "Comprehensive Motor Insurance",
+      description: "Covers damage to your vehicle and third-party liabilities.",
+      agentcode: "31212",
+      vehicleClass: ["MOTORVEHICLE_PRIVATE"],
+      coverage: "COMPREHENSIVE",
+      minAge: 0,
+      maxAge: 10,
+      minValue: 500000,
+      maxValue: 50000000,
+      minimumPremium: 15000,
+      premium_week: 5000,
+      premium_2weeks: 9000,
+      premium_month: 18000,
+      premium_3months: 50000,
+      premium_6months: 95000,
+      premium_annual: 180000,
+      passengers: null,
+      tonnage: null,
+      coverPeriod: null,
+      ExcludedMakes: [],
+    },
+    {
+      underwriterName: "APA Insurance Ltd",
+      name: "PSV Matatu Insurance",
+      description: "Covers matatus with period-based premiums.",
+      agentcode: "31212",
+      vehicleClass: ["PSV_MATATU"],
+      coverage: "THIRD_PARTY_ONLY",
+      minSeats: 7,
+      maxSeats: 36,
+      minimumPremium: 1000,
+      premium_week: 1000,
+      premium_2weeks: 1900,
+      premium_month: 3600,
+      premium_3months: 10500,
+      premium_6months: 20000,
+      premium_annual: 38000,
+      passengers: null,
+      tonnage: null,
+      coverPeriod: null,
+      ExcludedMakes: [],
+    },
+    {
+      underwriterName: "APA Insurance Ltd",
+      name: "PSV Bus Insurance",
+      description: "Covers buses with period-based premiums.",
+      agentcode: "31212",
+      vehicleClass: ["PSV_BUS"],
+      coverage: "THIRD_PARTY_ONLY",
+      minSeats: 37,
+      maxSeats: 105,
+      minimumPremium: 2000,
+      premium_week: 2000,
+      premium_2weeks: 3800,
+      premium_month: 7200,
+      premium_3months: 21000,
+      premium_6months: 40000,
+      premium_annual: 76000,
+      passengers: null,
+      tonnage: null,
+      coverPeriod: null,
+      ExcludedMakes: [],
+    }
+  ];
 
-  if (apa) {
+  for (const p of products) {
     try {
+      const underwriter = await prisma.underwriter.findUnique({
+        where: { name: p.underwriterName },
+      });
+
+      if (!underwriter) {
+        console.warn('⚠️ underwriter ${p.undewriterName} not found, skipping product ${p.name}');
+        continue;
+      }
+
       await prisma.product.upsert({
         where: {
-          // Use composite key for upsert instead of just name
-          unique_product_rule: {
-            underwriterId: apa.id,
-            agentcode: "31212",
-            vehicleClass: ["MOTORVEHICLE_PRIVATE"],
-            coverage: "COMPREHENSIVE",
-            minAge: 0,
-            maxAge: 10,
-            minValue: 500000,
-            maxValue: 50000000,
-            passengers: null,
-            tonnage: null
-          }
+          name_agentcode_underwriter: {
+            name: p.name,
+            agentcode: p.agentcode,
+            underwriterId: underwriter.id,
+          },
         },
         update: {},
         create: {
-          name: "Comprehensive Motor Insurance",
-          description: "Covers damage to your vehicle and third-party liabilities.",
-          underwriterId: apa.id,
-          vehicleClass: ["MOTORVEHICLE_PRIVATE"],
-          coverage: "COMPREHENSIVE",
-          minAge: 0,
-          maxAge: 10,
-          minValue: 500000,
-          maxValue: 50000000,
-          agentcode: "31212",
-          minimumPremium: 15000,
-          premium_annual: 3,
-          ExcludedMakes: [],
-          passengers: null,
-          tonnage: null,
-          coverPeriod: null,
-          basePremium: null
+          name: p.name,
+          description: p.description,
+          underwriterId: underwriter.id,
+          underwriterName: underwriter.name,
+          agentcode: p.agentcode,
+          vehicleClass: p.vehicleClass,
+          coverage: p.coverage,
+          minAge: p.minAge ?? null,
+          maxAge: p.maxAge ?? null,
+          minValue: p.minValue ?? null,
+          maxValue: p.maxValue ?? null,
+          minimumPremium: p.minimumPremium,
+          premium_week: p.premium_week,
+          premium_2weeks: p.premium_2weeks,
+          premium_month: p.premium_month,
+          premium_3months: p.premium_3months,
+          premium_6months: p.premium_6months,
+          premium_annual: p.premium_annual,
+          passengers: p.passengers ?? null,
+          tonnage: p.tonnage ?? null,
+          minSeats: p.minSeats ?? null,
+          maxSeats: p.maxSeats ?? null,
+          coverPeriod: p.coverPeriod ?? null,
+          ExcludedMakes: p.ExcludedMakes ?? [],
         },
       });
 
-      console.log("✅ Sample product seeded successfully");
+      console.log('✅ Product "${p.name}" seeded successfully');
     } catch (err) {
-      console.error("⚠️ Product seed skipped (already exists or error):", err.message);
+      console.error('⚠️ Product "${p.name}" seed skipped:, err.message');
     }
   }
 }
