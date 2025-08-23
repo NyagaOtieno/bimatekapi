@@ -69,43 +69,43 @@ exports.fetchQuote = async (req, res) => {
     const coverPeriodEnum = CoverPeriod[coverPeriod];
 
     // ========================
-    // STRICT DB FILTER (apply optional filters only if they exist)
+    // BASIC DB FILTER
     // ========================
-    const where = {
-      vehicleClass: { has: vehicleClass },
-      coverage,
-      agentcode,
-      coverPeriod: coverPeriodEnum,
-      ...(vehicleValue ? { minimumPremium: { lte: vehicleValue } } : {}),
-      ...(yearOfManufacture ? {
-        minAge: { lte: new Date().getFullYear() - yearOfManufacture },
-        maxAge: { gte: new Date().getFullYear() - yearOfManufacture }
-      } : {})
-    };
-
     let products = await prisma.product.findMany({
-      where,
+      where: {
+        vehicleClass: { has: vehicleClass },
+        coverage,
+        agentcode,
+        coverPeriod: coverPeriodEnum,
+      },
       include: { underwriter: true },
     });
 
-    // Exclude makes in JS (Prisma v6 safe)
+    // ========================
+    // Exclude makes in JS
+    // ========================
     if (make) products = products.filter(p => !p.ExcludedMakes?.includes(make));
 
-    // Business rules filtering
+    // ========================
+    // Business rules filtering (apply only if product has values set)
+    // ========================
     products = products.filter(product => {
-      if (vehicleClass.includes("PSV") && passengers) {
+      if (passengers) {
         if (product.minSeats && passengers < product.minSeats) return false;
         if (product.maxSeats && passengers > product.maxSeats) return false;
       }
-      if ((vehicleClass.includes("OWN_GOODS") || vehicleClass.includes("GENERAL_CARTAGE")) && tonnage) {
+      if (tonnage) {
         if (product.tonnage && tonnage > product.tonnage) return false;
       }
-      if (yearOfManufacture && product.minAge && product.maxAge) {
+      if (yearOfManufacture) {
         const age = new Date().getFullYear() - yearOfManufacture;
-        if (age < product.minAge || age > product.maxAge) return false;
+        if (product.minAge && age < product.minAge) return false;
+        if (product.maxAge && age > product.maxAge) return false;
       }
-      if (vehicleValue && product.minValue && product.maxValue) {
-        if (vehicleValue < product.minValue || vehicleValue > product.maxValue) return false;
+      if (vehicleValue) {
+        if (product.minValue && vehicleValue < product.minValue) return false;
+        if (product.maxValue && vehicleValue > product.maxValue) return false;
+        if (product.minimumPremium && vehicleValue < product.minimumPremium) return false;
       }
       return true;
     });
