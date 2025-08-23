@@ -20,27 +20,19 @@ function normalize(str) {
 function calculatePremium(product, coverage, coverPeriod, vehicleValue, passengers) {
   let premium = null;
 
-  // ✅ Comprehensive → rate * value (respect minPremium)
   if (coverage === "COMPREHENSIVE") {
     if (vehicleValue == null) return null;
     const calcPremium = (vehicleValue * (product.rate || 0)) / 100;
     premium = Math.max(calcPremium, product.minimumPremium || 0);
-  }
-
-  // ✅ PSV Matatu / PSV Bus (TPO only) → use seat count + coverPeriod
-  else if (
+  } else if (
     coverage === "THIRD_PARTY_ONLY" &&
     (product.vehicleClass.includes("PSV_MATATU") || product.vehicleClass.includes("PSV_BUS"))
   ) {
     if (passengers == null) return null;
-    if (product.passengers !== passengers) return null; // only match exact seat product
-
+    if (product.passengers !== passengers) return null;
     const premiumField = COVER_PERIOD_MAP[coverPeriod];
     premium = premiumField ? product[premiumField] : null;
-  }
-
-  // ✅ TPFT or other TPO (non-PSV) → just return premium for the period
-  else {
+  } else {
     const premiumField = COVER_PERIOD_MAP[coverPeriod];
     premium = premiumField ? product[premiumField] : product.basePremium;
   }
@@ -52,48 +44,42 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue, passenge
 // Eligibility Check
 // ========================
 function checkEligibility(product, filters) {
-  const { vehicleValue, vehicleAge, tonnage, agentCode } = filters;
+  const { vehicleValue, vehicleAge, tonnage, agentCode, make } = filters;
 
-  // ✅ Agent check
-  if (product.agentcode && agentCode && product.agentcode !== agentCode) {
+  // Agent code check (optional)
+  if (product.agentcode && agentCode && product.agentcode !== agentCode) return false;
+
+  // Vehicle value range
+  if (vehicleValue != null) {
+    if ((product.minValue != null && vehicleValue < product.minValue) ||
+        (product.maxValue != null && vehicleValue > product.maxValue)) {
+      return false;
+    }
+  }
+
+  // Vehicle age
+  if (vehicleAge != null) {
+    if ((product.minAge != null && vehicleAge < product.minAge) ||
+        (product.maxAge != null && vehicleAge > product.maxAge)) {
+      return false;
+    }
+  }
+
+  // Tonnage checks
+  if ((product.vehicleClass.includes("MOTORVEHICLE_OWN_GOODS") ||
+       product.vehicleClass.includes("MOTORVEHICLE_GENERAL_CARTAGE")) &&
+      tonnage != null) {
+    if ((product.minTonnage != null && tonnage < product.minTonnage) ||
+        (product.maxTonnage != null && tonnage > product.maxTonnage)) {
+      return false;
+    }
+  }
+
+  // Make exclusion
+  if (make && product.excludedMakes && product.excludedMakes.includes(make.toUpperCase())) {
     return false;
   }
 
-  // ✅ Vehicle value range
-  if (vehicleValue != null) {
-    if (
-      (product.minValue != null && vehicleValue < product.minValue) ||
-      (product.maxValue != null && vehicleValue > product.maxValue)
-    ) {
-      return false;
-    }
-  }
-
-  // ✅ Vehicle age
-  if (vehicleAge != null) {
-    if (
-      (product.minAge != null && vehicleAge < product.minAge) ||
-      (product.maxAge != null && vehicleAge > product.maxAge)
-    ) {
-      return false;
-    }
-  }
-
-  // ✅ Tonnage checks
-  if (
-    product.vehicleClass.includes("MOTORVEHICLE_OWN_GOODS") ||
-    product.vehicleClass.includes("MOTORVEHICLE_GENERAL_CARTAGE")
-  ) {
-    if (
-      tonnage != null &&
-      ((product.minTonnage != null && tonnage < product.minTonnage) ||
-        (product.maxTonnage != null && tonnage > product.maxTonnage))
-    ) {
-      return false;
-    }
-  }
-
-  // ⚠️ NOTE: no passenger check here — handled in premium calculation
   return true;
 }
 
@@ -107,10 +93,11 @@ exports.fetchQuote = async (req, res) => {
       coverage,
       coverPeriod,
       vehicleValue,
-      vehicleAge,
+      yearOfManufacture,
       tonnage,
       passengers,
       agentCode,
+      make,
     } = req.body;
 
     vehicleClass = normalize(vehicleClass);
@@ -118,12 +105,12 @@ exports.fetchQuote = async (req, res) => {
     coverPeriod = coverPeriod ? normalize(coverPeriod) : null;
 
     if (!vehicleClass || !coverage) {
-      return res.status(400).json({
-        message: "vehicleClass and coverage are required",
-      });
+      return res.status(400).json({ message: "vehicleClass and coverage are required" });
     }
 
-    // Fetch candidate products
+    // Calculate vehicle age if yearOfManufacture is provided
+    const vehicleAge = yearOfManufacture ? new Date().getFullYear() - yearOfManufacture : null;
+
     const products = await prisma.product.findMany({
       where: {
         vehicleClass: { has: vehicleClass },
@@ -132,23 +119,12 @@ exports.fetchQuote = async (req, res) => {
       include: { underwriter: true },
     });
 
-    if (!products.length) {
-      return res.status(404).json({ message: "No matching product found" });
-    }
+    if (!products.length) return res.status(404).json({ message: "No matching product found" });
 
-    // Filter and calculate
     const quotes = products
-      .filter((product) =>
-        checkEligibility(product, { vehicleValue, vehicleAge, tonnage, agentCode })
-      )
+      .filter((product) => checkEligibility(product, { vehicleValue, vehicleAge, tonnage, agentCode, make }))
       .map((product) => {
-        const premium = calculatePremium(
-          product,
-          coverage,
-          coverPeriod,
-          vehicleValue,
-          passengers
-        );
+        const premium = calculatePremium(product, coverage, coverPeriod, vehicleValue, passengers);
 
         return {
           productId: product.id,
@@ -165,15 +141,9 @@ exports.fetchQuote = async (req, res) => {
       })
       .filter((q) => q.premium != null);
 
-    if (!quotes.length) {
-      return res.status(404).json({ message: "No eligible product found" });
-    }
+    if (!quotes.length) return res.status(404).json({ message: "No eligible product found" });
 
-    return res.json({
-      message: "Quotes fetched successfully",
-      count: quotes.length,
-      data: quotes,
-    });
+    return res.json({ message: "Quotes fetched successfully", count: quotes.length, data: quotes });
   } catch (err) {
     console.error("❌ Error fetching quote:", err);
     res.status(500).json({ message: "Server error", error: err.message });
