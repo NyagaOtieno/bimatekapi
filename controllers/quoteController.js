@@ -1,148 +1,74 @@
 // controllers/quoteController.js
-const { PrismaClient, CoverageType, CoverPeriod } = require('@prisma/client');
+const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const Joi = require('joi');
 
-// ========================
-// VALIDATION SCHEMAS
-// ========================
-const coverPeriods = Object.values(CoverPeriod);
-
-const searchValidationSchema = Joi.object({
-  vehicleClass: Joi.string().required(),
-  coverage: Joi.string().valid(...Object.values(CoverageType)).required(),
-  coverPeriod: Joi.string().valid(...coverPeriods).required(),
-  agentcode: Joi.string().required(),
-  make: Joi.string().allow(null, ''),
-  model: Joi.string().allow(null, ''),
-  vehicle_reg: Joi.string().allow(null, ''),
-  value: Joi.number().positive().allow(null),
-  yearOfManufacture: Joi.number().integer().min(1980).allow(null),
-  passengers: Joi.number().integer().min(1).allow(null),
-  tonnage: Joi.number().positive().allow(null),
-});
-
-// ========================
-// HELPERS
-// ========================
-function normalizeVehicleClass(vehicleClass, coverage) {
-  if (vehicleClass === 'GENERAL_CARTAGE' && coverage === CoverageType.THIRD_PARTY_ONLY) {
-    return 'MOTORVEHICLE_OWN_GOODS';
-  }
-  return vehicleClass;
-}
-
-function getPremiumForPeriod(product, coverPeriod) {
-  switch (coverPeriod) {
-    case CoverPeriod.ONE_WEEK: return product.premium_week ?? product.minimumPremium ?? 0;
-    case CoverPeriod.TWO_WEEKS: return product.premium_2weeks ?? product.minimumPremium ?? 0;
-    case CoverPeriod.ONE_MONTH: return product.premium_month ?? product.minimumPremium ?? 0;
-    case CoverPeriod.THREE_MONTHS: return product.premium_3months ?? product.minimumPremium ?? 0;
-    case CoverPeriod.SIX_MONTHS: return product.premium_6months ?? product.minimumPremium ?? 0;
-    case CoverPeriod.ONE_YEAR: return product.premium_annual ?? product.minimumPremium ?? 0;
-    default: return product.minimumPremium ?? 0;
-  }
-}
-
-function calculatePremium(product, vehicleClass, vehicleValue, tonnage, passengers, coverPeriod) {
-  let premium = getPremiumForPeriod(product, coverPeriod);
-
-  if (vehicleClass.includes("PSV") && passengers && product.maxSeats && passengers > product.maxSeats) return null;
-  if ((vehicleClass.includes("OWN_GOODS") || vehicleClass.includes("GENERAL_CARTAGE")) && tonnage && product.tonnage && tonnage > product.tonnage) return null;
-  if (product.coverage === CoverageType.COMPREHENSIVE && vehicleValue) {
-    // at least 5% of value
-    premium = Math.max(premium, vehicleValue * 0.05);
-  }
-
-  return premium;
-}
-
-// ========================
-// CONTROLLERS
-// ========================
 exports.fetchQuote = async (req, res) => {
   try {
-    const { error, value } = searchValidationSchema.validate(req.body);
-    if (error) return res.status(400).json({ message: error.details[0].message });
-
-    let { vehicleClass, coverage, coverPeriod, agentcode, make, value: vehicleValue, passengers, tonnage, yearOfManufacture } = value;
-    vehicleClass = normalizeVehicleClass(vehicleClass, coverage);
-
-    if (!CoverPeriod[coverPeriod]) return res.status(400).json({ message: 'Invalid coverPeriod value' });
-    const coverPeriodEnum = CoverPeriod[coverPeriod];
-
-    // ========================
-    // PRISMA QUERY (only strict requirements)
-    // ========================
-    const where = {
-      vehicleClass: { has: vehicleClass }, // ✅ supports array enums
+    const {
+      vehicleClass,
       coverage,
-      coverPeriod: coverPeriodEnum,
+      coverPeriod,
       agentcode,
-    };
+      value,
+      passengers,
+      yearOfManufacture,
+      tonneage
+    } = req.body;
 
-    console.log("🔍 Prisma WHERE:", where);
+    console.log("👉 Incoming request body:", req.body);
 
-    let products = await prisma.product.findMany({
-      where,
-      include: { underwriter: true },
+    // Step 1: Try to find product by strict required fields
+    const products = await prisma.product.findMany({
+      where: {
+        vehicleClass: vehicleClass,
+        coverage: coverage,
+        coverPeriod: coverPeriod
+      }
     });
 
-    // ========================
-    // Exclude makes
-    // ========================
-    if (make) products = products.filter(p => !p.ExcludedMakes?.includes(make));
+    console.log("✅ Products fetched from DB:", products);
 
-    // ========================
-    // Business rules filtering
-    // ========================
-    products = products.filter(product => {
-      if (passengers) {
-        if (product.minSeats && passengers < product.minSeats) return false;
-        if (product.maxSeats && passengers > product.maxSeats) return false;
-      }
-      if (tonnage) {
-        if (product.tonnage && tonnage > product.tonnage) return false;
-      }
-      if (yearOfManufacture) {
-        const age = new Date().getFullYear() - yearOfManufacture;
-        if (product.minAge && age < product.minAge) return false;
-        if (product.maxAge && age > product.maxAge) return false;
-      }
-      if (vehicleValue) {
-        if (product.minValue && vehicleValue < product.minValue) return false;
-        if (product.maxValue && vehicleValue > product.maxValue) return false;
-      }
-      return true;
+    if (!products || products.length === 0) {
+      return res.status(404).json({ message: "No products found for class+coverage+period" });
+    }
+
+    // Step 2: Apply optional filters safely
+    let matchingProduct = products.find((p) => {
+      let isMatch = true;
+
+      if (p.minValue && value && value < p.minValue) isMatch = false;
+      if (p.maxValue && value && value > p.maxValue) isMatch = false;
+
+      if (p.minPassengers && passengers && passengers < p.minPassengers) isMatch = false;
+      if (p.maxPassengers && passengers && passengers > p.maxPassengers) isMatch = false;
+
+      if (p.minYear && yearOfManufacture && yearOfManufacture < p.minYear) isMatch = false;
+      if (p.maxYear && yearOfManufacture && yearOfManufacture > p.maxYear) isMatch = false;
+
+      if (p.tonneage && tonneage && p.tonneage !== tonneage) isMatch = false;
+
+      return isMatch;
     });
 
-    if (!products.length) return res.status(404).json({ message: 'No matching product found' });
+    if (!matchingProduct) {
+      return res.status(404).json({ message: "No matching product found after optional filters" });
+    }
 
-    const results = products.map(product => {
-      const premium = calculatePremium(product, vehicleClass, vehicleValue, tonnage, passengers, coverPeriodEnum);
-      if (premium === null) return null;
-      return {
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        agentcode: product.agentcode,
-        vehicleClass: product.vehicleClass,
-        coverage: product.coverage,
-        coverPeriod: product.coverPeriod,
-        minimumPremium: product.minimumPremium,
-        calculatedPremium: premium,
-        underwriter: { id: product.underwriter.id, name: product.underwriter.name },
-      };
-    }).filter(Boolean);
+    // Step 3: Calculate premium
+    let premium = matchingProduct.basePremium;
+    if (value) {
+      premium = Math.max(matchingProduct.minimumPremium || 0, value * (matchingProduct.rate / 100));
+    }
 
-    if (!results.length) return res.status(404).json({ message: 'No matching product found after business rules check' });
+    return res.json({
+      message: "Quote fetched successfully",
+      product: matchingProduct,
+      agentcode,
+      premium
+    });
 
-    res.json({ message: 'Quote fetched successfully', products: results });
-  } catch (err) {
-    console.error('❌ Failed to fetch quote:', err);
-    res.status(500).json({ message: 'Failed to fetch quote', error: err.message });
+  } catch (error) {
+    console.error("❌ Error in fetchQuote:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
-// Alias
-exports.searchQuotes = exports.fetchQuote;
