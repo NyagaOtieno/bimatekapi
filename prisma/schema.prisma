@@ -47,9 +47,9 @@ model Product {
   vehicleClass     VehicleClass[]
   coverage         CoverageType
 
-  // PSV-specific (fixed seat capacity band)
-  minSeats         Int?           // e.g. 7
-  maxSeats         Int?           // e.g. 36 for matatus, 105 for buses
+  // PSV-specific (seat capacity handled via PsvPremium)
+  minSeats         Int?           // optional for general info
+  maxSeats         Int?
 
   // Goods/commercial-specific
   tonnage          Int?
@@ -67,9 +67,26 @@ model Product {
 
   policies         Policy[]
   quotes           Quote[]
+  psvPremiums      PsvPremium[]
 
   @@index([coverage, agentcode, underwriterId], map: "Product_coverage_agentcode_underwriter_idx")
   @@index([underwriterName], map: "Product_underwriterName_idx")
+}
+
+model PsvPremium {
+  id             Int       @id @default(autoincrement())
+  productId      Int
+  passengers     Int       // exact seat capacity
+  premium_week   Float?
+  premium_2weeks Float?
+  premium_month  Float?
+  premium_3months Float?
+  premium_6months Float?
+  premium_annual Float?
+
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
 }
 
 model Quote {

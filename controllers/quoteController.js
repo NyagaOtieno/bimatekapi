@@ -1,14 +1,13 @@
-// controllers/quoteController.js
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 const COVER_PERIOD_MAP = {
-  WEEK: "premium_week",
+  ONE_WEEK: "premium_week",
   TWO_WEEKS: "premium_2weeks",
-  MONTH: "premium_month",
+  ONE_MONTH: "premium_month",
   THREE_MONTHS: "premium_3months",
   SIX_MONTHS: "premium_6months",
-  ANNUAL: "premium_annual",
+  ONE_YEAR: "premium_annual",
 };
 
 function normalize(str) {
@@ -18,14 +17,30 @@ function normalize(str) {
 // ========================
 // Premium Calculation
 // ========================
-function calculatePremium(product, coverage, coverPeriod, vehicleValue) {
+function calculatePremium(product, coverage, coverPeriod, vehicleValue, passengers) {
   let premium = null;
 
+  // ✅ Comprehensive → rate * value (respect minPremium)
   if (coverage === "COMPREHENSIVE") {
-    if (!vehicleValue) return null;
+    if (vehicleValue == null) return null;
     const calcPremium = (vehicleValue * (product.rate || 0)) / 100;
     premium = Math.max(calcPremium, product.minimumPremium || 0);
-  } else {
+  }
+
+  // ✅ PSV Matatu / PSV Bus (TPO only) → use seat count + coverPeriod
+  else if (
+    coverage === "THIRD_PARTY_ONLY" &&
+    (product.vehicleClass.includes("PSV_MATATU") || product.vehicleClass.includes("PSV_BUS"))
+  ) {
+    if (passengers == null) return null;
+    if (product.passengers !== passengers) return null; // only match exact seat product
+
+    const premiumField = COVER_PERIOD_MAP[coverPeriod];
+    premium = premiumField ? product[premiumField] : null;
+  }
+
+  // ✅ TPFT or other TPO (non-PSV) → just return premium for the period
+  else {
     const premiumField = COVER_PERIOD_MAP[coverPeriod];
     premium = premiumField ? product[premiumField] : product.basePremium;
   }
@@ -37,63 +52,48 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue) {
 // Eligibility Check
 // ========================
 function checkEligibility(product, filters) {
-  const {
-    vehicleValue,
-    vehicleAge,
-    tonnage,
-    passengers,
-    agentCode,
-  } = filters;
+  const { vehicleValue, vehicleAge, tonnage, agentCode } = filters;
 
   // ✅ Agent check
-  if (product.agentCode && agentCode && product.agentCode !== agentCode) {
+  if (product.agentcode && agentCode && product.agentcode !== agentCode) {
     return false;
   }
 
   // ✅ Vehicle value range
-  if (vehicleValue) {
+  if (vehicleValue != null) {
     if (
-      (product.minValue && vehicleValue < product.minValue) ||
-      (product.maxValue && vehicleValue > product.maxValue)
+      (product.minValue != null && vehicleValue < product.minValue) ||
+      (product.maxValue != null && vehicleValue > product.maxValue)
     ) {
       return false;
     }
   }
 
   // ✅ Vehicle age
-  if (vehicleAge) {
+  if (vehicleAge != null) {
     if (
-      (product.minAge && vehicleAge < product.minAge) ||
-      (product.maxAge && vehicleAge > product.maxAge)
+      (product.minAge != null && vehicleAge < product.minAge) ||
+      (product.maxAge != null && vehicleAge > product.maxAge)
     ) {
       return false;
     }
   }
 
-  // ✅ Tonnage checks for OWN GOODS / GENERAL CARTAGE
+  // ✅ Tonnage checks
   if (
     product.vehicleClass.includes("MOTORVEHICLE_OWN_GOODS") ||
     product.vehicleClass.includes("MOTORVEHICLE_GENERAL_CARTAGE")
   ) {
     if (
-      tonnage &&
-      ((product.minTonnage && tonnage < product.minTonnage) ||
-        (product.maxTonnage && tonnage > product.maxTonnage))
+      tonnage != null &&
+      ((product.minTonnage != null && tonnage < product.minTonnage) ||
+        (product.maxTonnage != null && tonnage > product.maxTonnage))
     ) {
       return false;
     }
   }
 
-  // ✅ Exact passenger check for PSV
-  if (
-    product.vehicleClass.includes("PSV_MATATU") ||
-    product.vehicleClass.includes("PSV_BUS")
-  ) {
-    if (passengers && product.passengers && passengers !== product.passengers) {
-      return false;
-    }
-  }
-
+  // ⚠️ NOTE: no passenger check here — handled in premium calculation
   return true;
 }
 
@@ -132,27 +132,22 @@ exports.fetchQuote = async (req, res) => {
       include: { underwriter: true },
     });
 
-    if (!products || products.length === 0) {
+    if (!products.length) {
       return res.status(404).json({ message: "No matching product found" });
     }
 
-    // Filter by eligibility and calculate premium
+    // Filter and calculate
     const quotes = products
       .filter((product) =>
-        checkEligibility(product, {
-          vehicleValue,
-          vehicleAge,
-          tonnage,
-          passengers,
-          agentCode,
-        })
+        checkEligibility(product, { vehicleValue, vehicleAge, tonnage, agentCode })
       )
       .map((product) => {
         const premium = calculatePremium(
           product,
           coverage,
           coverPeriod,
-          vehicleValue
+          vehicleValue,
+          passengers
         );
 
         return {
@@ -162,14 +157,15 @@ exports.fetchQuote = async (req, res) => {
           vehicleClass,
           coverage,
           coverPeriod: coverPeriod || "BASE",
+          passengers: product.passengers || null,
           rate: product.rate,
           minimumPremium: product.minimumPremium,
           premium,
         };
       })
-      .filter((q) => q.premium !== null); // drop invalid premiums
+      .filter((q) => q.premium != null);
 
-    if (quotes.length === 0) {
+    if (!quotes.length) {
       return res.status(404).json({ message: "No eligible product found" });
     }
 

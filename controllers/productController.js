@@ -1,4 +1,3 @@
-// controllers/productController.js
 const { PrismaClient, CoverageType } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { productValidationSchema } = require("../validation/product.validation");
@@ -46,9 +45,7 @@ function validateProductRules(data) {
       if (vehicleClass.some(vc => vc.includes("OWN_GOODS") || vc.includes("GENERAL_CARTAGE"))) {
         if (tonnage == null) throw new Error("tonnage is required for OWN_GOODS or GENERAL_CARTAGE vehicles");
       }
-      if (vehicleClass.some(vc => vc.includes("PSV"))) {
-        if (passengers == null) throw new Error("passengers is required for PSV vehicles");
-      }
+      // passengers validation now optional; handled via PsvPremium
       break;
 
     default:
@@ -72,7 +69,6 @@ async function checkDuplicateProduct(validatedData, underwriterId, excludeId = n
       maxAge: validatedData.maxAge ?? null,
       minValue: validatedData.minValue ?? null,
       maxValue: validatedData.maxValue ?? null,
-      passengers: validatedData.passengers ?? null,
       tonnage: validatedData.tonnage ?? null,
       id: excludeId ? { not: excludeId } : undefined,
     },
@@ -100,7 +96,7 @@ exports.createProduct = async (req, res) => {
 
     const duplicate = await checkDuplicateProduct(validatedData, underwriter.id);
     if (duplicate) {
-      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value range, passengers or tonnage" });
+      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value range or tonnage" });
     }
 
     const product = await prisma.product.create({
@@ -167,7 +163,7 @@ exports.updateProduct = async (req, res) => {
 
     const duplicate = await checkDuplicateProduct(validatedData, underwriterId, id);
     if (duplicate) {
-      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value range, passengers or tonnage" });
+      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value range or tonnage" });
     }
 
     const updatedProduct = await prisma.product.update({
