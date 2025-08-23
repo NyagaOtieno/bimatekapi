@@ -84,16 +84,12 @@ function checkEligibility(product, filters) {
     }
   }
 
-  // ✅ Passenger capacity checks for PSV
+  // ✅ Exact passenger check for PSV
   if (
     product.vehicleClass.includes("PSV_MATATU") ||
     product.vehicleClass.includes("PSV_BUS")
   ) {
-    if (
-      passengers &&
-      ((product.minPassengers && passengers < product.minPassengers) ||
-        (product.maxPassengers && passengers > product.maxPassengers))
-    ) {
+    if (passengers && product.passengers && passengers !== product.passengers) {
       return false;
     }
   }
