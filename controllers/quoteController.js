@@ -7,8 +7,8 @@ const COVER_PERIOD_MAP = {
   ONE_MONTH: "premium_month",
   THREE_MONTHS: "premium_3months",
   SIX_MONTHS: "premium_6months",
-  ONE_YEAR: "basePremium",   // For TPO / TPFT
-  ANNUAL: "premium_annual",  // For Comprehensive (rate %)
+  ONE_YEAR: "basePremium",   // ✅ For TPO / TPFT
+  ANNUAL: "premium_annual",  // ✅ For Comprehensive (rate %)
 };
 
 function normalize(str) {
@@ -22,6 +22,9 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue, passenge
   let premium = null;
 
   if (coverage === "COMPREHENSIVE") {
+    if (coverPeriod !== "ANNUAL") {
+      throw new Error("Comprehensive only supports ANNUAL cover");
+    }
     if (vehicleValue == null) return null;
 
     // ✅ Comprehensive always uses premium_annual (rate %) × vehicleValue
@@ -137,7 +140,12 @@ exports.fetchQuote = async (req, res) => {
         return eligible;
       })
       .map((product) => {
-        const premium = calculatePremium(product, coverage, coverPeriod, vehicleValue, passengers);
+        let premium;
+        try {
+          premium = calculatePremium(product, coverage, coverPeriod, vehicleValue, passengers);
+        } catch (err) {
+          return { error: err.message, productId: product.id };
+        }
 
         return {
           productId: product.id,
