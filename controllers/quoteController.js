@@ -7,7 +7,8 @@ const COVER_PERIOD_MAP = {
   ONE_MONTH: "premium_month",
   THREE_MONTHS: "premium_3months",
   SIX_MONTHS: "premium_6months",
-  ONE_YEAR: "premium_annual",
+  ONE_YEAR: "basePremium",   // For TPO / TPFT
+  ANNUAL: "premium_annual",  // For Comprehensive (rate %)
 };
 
 function normalize(str) {
@@ -23,22 +24,28 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue, passenge
   if (coverage === "COMPREHENSIVE") {
     if (vehicleValue == null) return null;
 
-    // ✅ Calculate premium as % of value
-    const calcPremium = (vehicleValue * (product.rate || 0)) / 100;
+    // ✅ Comprehensive always uses premium_annual (rate %) × vehicleValue
+    const calcPremium = (vehicleValue * (product.premium_annual || 0)) / 100;
 
     // ✅ Apply minimum premium rule
     premium = Math.max(calcPremium, product.minimumPremium || 0);
 
   } else if (
-    coverage === "THIRD_PARTY_ONLY" &&
+    (coverage === "THIRD_PARTY_ONLY" || coverage === "THIRD_PARTY_FIRE_THEFT") &&
     (product.vehicleClass.includes("PSV_MATATU") || product.vehicleClass.includes("PSV_BUS"))
   ) {
+    // ✅ PSV (Matatu/Bus) TPO / TPFT based on passengers and coverPeriod
     if (passengers == null) return null;
     if (product.passengers !== passengers) return null;
     const premiumField = COVER_PERIOD_MAP[coverPeriod];
     premium = premiumField ? product[premiumField] : null;
 
+  } else if (coverage === "THIRD_PARTY_ONLY" || coverage === "THIRD_PARTY_FIRE_THEFT") {
+    // ✅ All other TPO / TPFT → always basePremium
+    premium = product.basePremium;
+
   } else {
+    // ✅ fallback: short-term products
     const premiumField = COVER_PERIOD_MAP[coverPeriod];
     premium = premiumField ? product[premiumField] : product.basePremium;
   }
@@ -140,7 +147,7 @@ exports.fetchQuote = async (req, res) => {
           coverage,
           coverPeriod: coverPeriod || "BASE",
           passengers: product.passengers || null,
-          rate: product.rate,
+          rate: product.premium_annual,
           minimumPremium: product.minimumPremium,
           premium,
         };
