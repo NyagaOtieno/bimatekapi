@@ -22,7 +22,11 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue, passenge
 
   if (coverage === "COMPREHENSIVE") {
     if (vehicleValue == null) return null;
-    const calcPremium = (vehicleValue * (product.rate || 0)) / 100;
+
+    // ✅ Calculate premium as (value * rate)
+    const calcPremium = vehicleValue * (product.rate || 0);
+
+    // ✅ Apply minimum premium rule
     premium = Math.max(calcPremium, product.minimumPremium || 0);
   } else if (
     coverage === "THIRD_PARTY_ONLY" &&
@@ -39,6 +43,7 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue, passenge
 
   return premium;
 }
+
 
 // ========================
 // Eligibility Check
