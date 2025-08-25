@@ -47,13 +47,13 @@ model Product {
   vehicleClass     VehicleClass[]
   coverage         CoverageType
 
-  // PSV-specific (seat capacity handled via PsvPremium)
-  Seats         Int?           // optional for general info
-
+  // PSV-specific
+  minSeats         Int?           // ✅ replacing generic Seats
+  maxSeats         Int?           // ✅ replacing generic Seats
 
   // Goods/commercial-specific
-  minTonnage          Int?
-  maxTonnage          Int? 
+  minTonnage       Int?           // ✅ already present
+  maxTonnage       Int?           // ✅ already present
 
   // Comprehensive-specific
   minAge           Int?           
