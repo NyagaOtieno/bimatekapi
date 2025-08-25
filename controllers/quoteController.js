@@ -23,8 +23,8 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue, passenge
   if (coverage === "COMPREHENSIVE") {
     if (vehicleValue == null) return null;
 
-    // ✅ Calculate premium as (value * rate)
-    const calcPremium = vehicleValue * (product.rate || 0);
+    // ✅ Use rate derived from DB (already normalized below)
+    const calcPremium = (vehicleValue * (product.rate || 0)) / 100;
 
     // ✅ Apply minimum premium rule
     premium = Math.max(calcPremium, product.minimumPremium || 0);
@@ -43,7 +43,6 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue, passenge
 
   return premium;
 }
-
 
 // ========================
 // Eligibility Check
@@ -110,7 +109,7 @@ exports.fetchQuote = async (req, res) => {
 
     const vehicleAge = yearOfManufacture ? new Date().getFullYear() - yearOfManufacture : null;
 
-    const products = await prisma.product.findMany({
+    let products = await prisma.product.findMany({
       where: {
         vehicleClass: { has: vehicleClass },
         coverage,
@@ -121,6 +120,17 @@ exports.fetchQuote = async (req, res) => {
     console.log("Products fetched:", products.length);
 
     if (!products.length) return res.status(404).json({ message: "No matching product found" });
+
+    // ✅ Map product.rate from premium fields (esp. premium_annual for COMPREHENSIVE)
+    products = products.map((p) => {
+      if (!p.rate) {
+        const premiumField = COVER_PERIOD_MAP[coverPeriod || "ONE_YEAR"];
+        if (premiumField && p[premiumField]) {
+          p.rate = p[premiumField]; // e.g., 3 → meaning 3%
+        }
+      }
+      return p;
+    });
 
     const quotes = products
       .filter((product) => {
