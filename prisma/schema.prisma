@@ -48,11 +48,12 @@ model Product {
   coverage         CoverageType
 
   // PSV-specific (seat capacity handled via PsvPremium)
-  minSeats         Int?           // optional for general info
-  maxSeats         Int?
+  Seats         Int?           // optional for general info
+
 
   // Goods/commercial-specific
-  tonnage          Int?
+  minTonnage          Int?
+  maxTonnage          Int? 
 
   // Comprehensive-specific
   minAge           Int?           

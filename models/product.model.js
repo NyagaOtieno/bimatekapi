@@ -36,7 +36,7 @@ module.exports = (sequelize, DataTypes) => {
       minTonnage: { type: DataTypes.INTEGER },
       maxTonnage: { type: DataTypes.INTEGER },
 
-      passengers: { type: DataTypes.INTEGER },
+      Seats: { type: DataTypes.INTEGER },
 
       // Age/Value ranges for premium determination
       minAge: { type: DataTypes.INTEGER },
@@ -56,7 +56,7 @@ module.exports = (sequelize, DataTypes) => {
       premium_month: { type: DataTypes.DECIMAL(10, 2) },
       premium_3months: { type: DataTypes.DECIMAL(10, 2) },
       premium_6months: { type: DataTypes.DECIMAL(10, 2) },
-      premium_annual: { type: DataTypes.DECIMAL(10, 2) },
+      basePremium: { type: DataTypes.DECIMAL(10, 2) },
     },
     {
       indexes: [
@@ -73,6 +73,7 @@ module.exports = (sequelize, DataTypes) => {
             "maxValue",
             "minTonnage",
             "maxTonnage",
+            "Seats",
           ],
           name: "unique_product_constraint",
         },
