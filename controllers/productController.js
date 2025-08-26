@@ -34,7 +34,7 @@ function validateProductRules(data) {
       if (!Array.isArray(ExcludedMakes)) throw new Error("ExcludedMakes must be an array for COMPREHENSIVE");
       break;
 
-    case CoverageType.THIRD_PARTY_FIRE AND THEFT:
+    case CoverageType.THIRD_PARTY_FIRE_AND_THEFT:
       if (minAge == null || maxAge == null) throw new Error("minAge and maxAge are required for TPF&T");
       if (minValue == null || maxValue == null) throw new Error("minValue and maxValue are required for TPF&T");
       if (!Array.isArray(ExcludedMakes)) throw new Error("ExcludedMakes must be an array for TPF&T");
