@@ -7,44 +7,46 @@ const productController = require("../../controllers/productController");
 const { productValidationSchema } = require("../../validation/product.validation");
 
 // ========================
-// Middleware
+// Middleware (Reusable)
 // ========================
-const validateProduct = (req, res, next) => {
-  try {
-    const { error } = productValidationSchema.validate(req.body, { abortEarly: false });
-    if (error) {
-      return res.status(400).json({
-        message: "Validation error",
-        details: error.details.map((d) => d.message),
-      });
+const validateRequest = (schema) => {
+  return (req, res, next) => {
+    try {
+      const { error } = schema.validate(req.body, { abortEarly: false });
+      if (error) {
+        return res.status(400).json({
+          message: "Validation error",
+          errors: error.details.map((d) => ({
+            field: d.context?.key || "unknown",
+            message: d.message,
+          })),
+        });
+      }
+      next();
+    } catch (err) {
+      console.error("Validation middleware error:", err);
+      return res.status(500).json({ message: "Internal validation error" });
     }
-    next();
-  } catch (err) {
-    console.error("Validation middleware error:", err);
-    return res.status(500).json({ message: "Internal validation error" });
-  }
+  };
 };
 
 // ========================
 // Product Routes
 // ========================
 
-// ✅ Create a new product
-router.post("/", validateProduct, productController.createProduct);
+// Create a new product
+router.post("/", validateRequest(productValidationSchema), productController.createProduct);
 
-// ✅ Get all products (supports filtering, pagination, sorting via query params)
+// Get all products (with optional query filters)
 router.get("/", productController.getProducts);
 
-// ✅ Get a single product by ID
+// Get a single product by ID
 router.get("/:id", productController.getProductById);
 
-// ✅ Update a product by ID
-router.put("/:id", validateProduct, productController.updateProduct);
+// Update a product by ID
+router.put("/:id", validateRequest(productValidationSchema), productController.updateProduct);
 
-// ✅ Delete a product by ID
+// Delete a product by ID
 router.delete("/:id", productController.deleteProduct);
-
-// ✅ Bulk delete (optional - handles multiple product IDs at once)
-router.delete("/", productController.deleteMultipleProducts);
 
 module.exports = router;
