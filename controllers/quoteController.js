@@ -24,7 +24,7 @@ function normalizeCoverage(value) {
  * Validate product rules based on coverage type
  */
 function validateProductRules(data) {
-  const { coverage, vehicleClass, coverPeriod, seats, minTonnage, maxTonnage, minAge, maxAge, minValue, maxValue, ExcludedMakes, minimumPremium } = data;
+  const { coverage, vehicleClass, coverPeriod, Seats, minTonnage, maxTonnage, minAge, maxAge, minValue, maxValue, ExcludedMakes, minimumPremium } = data;
 
   switch (coverage) {
     case CoverageType.COMPREHENSIVE:
@@ -45,7 +45,7 @@ function validateProductRules(data) {
       if (vehicleClass.some(vc => vc.includes("OWN_GOODS") || vc.includes("GENERAL_CARTAGE"))) {
         if (minTonnage == null || maxTonnage == null) throw new Error("minTonnage and maxTonnage are required for OWN_GOODS or GENERAL_CARTAGE vehicles");
       }
-      // ✅ seats validation now optional; handled elsewhere
+      // ✅ Seats validation now optional; handled elsewhere
       break;
 
     default:
@@ -69,7 +69,7 @@ async function checkDuplicateProduct(validatedData, underwriterId, excludeId = n
       maxAge: validatedData.maxAge ?? null,
       minValue: validatedData.minValue ?? null,
       maxValue: validatedData.maxValue ?? null,
-      seats: validatedData.seats ?? null,
+      Seats: validatedData.Seats ?? null, // ✅ corrected casing
       minTonnage: validatedData.minTonnage ?? null,
       maxTonnage: validatedData.maxTonnage ?? null,
       id: excludeId ? { not: excludeId } : undefined,
