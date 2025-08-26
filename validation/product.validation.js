@@ -107,6 +107,38 @@ const productValidationSchema = Joi.object({
   maxValue: Joi.number().positive().optional(),
   ExcludedMakes: Joi.array().items(Joi.string()).optional(),
 
+  // ✅ PSV-specific premium fields
+  premium_week: Joi.number().positive().when("vehicleClass", {
+    is: Joi.alternatives().try("PSV_MATATU", "PSV_BUS"),
+    then: Joi.optional(),
+    otherwise: Joi.forbidden()
+  }),
+  premium_2weeks: Joi.number().positive().when("vehicleClass", {
+    is: Joi.alternatives().try("PSV_MATATU", "PSV_BUS"),
+    then: Joi.optional(),
+    otherwise: Joi.forbidden()
+  }),
+  premium_month: Joi.number().positive().when("vehicleClass", {
+    is: Joi.alternatives().try("PSV_MATATU", "PSV_BUS"),
+    then: Joi.optional(),
+    otherwise: Joi.forbidden()
+  }),
+  premium_3months: Joi.number().positive().when("vehicleClass", {
+    is: Joi.alternatives().try("PSV_MATATU", "PSV_BUS"),
+    then: Joi.optional(),
+    otherwise: Joi.forbidden()
+  }),
+  premium_6months: Joi.number().positive().when("vehicleClass", {
+    is: Joi.alternatives().try("PSV_MATATU", "PSV_BUS"),
+    then: Joi.optional(),
+    otherwise: Joi.forbidden()
+  }),
+  Seats: Joi.number().integer().positive().when("vehicleClass", {
+    is: Joi.alternatives().try("PSV_MATATU", "PSV_BUS"),
+    then: Joi.optional(),
+    otherwise: Joi.forbidden()
+  }),
+
   yearOfManufacture: Joi.any().forbidden() // ✅ not allowed on product
 });
 
