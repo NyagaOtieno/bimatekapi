@@ -72,7 +72,7 @@ async function checkDuplicateProduct(validatedData, underwriterId, excludeId = n
       tonnage: validatedData.tonnage ?? null,
       minTonnage: validatedData.minTonnage ?? null,
       maxTonnage: validatedData.maxTonnage ?? null,
-      seats: validatedData.seats ?? null,
+      Seats: validatedData.seats ?? null,
       id: excludeId ? { not: excludeId } : undefined,
     },
   });
@@ -110,7 +110,7 @@ exports.createProduct = async (req, res) => {
         minimumPremium: coverage === CoverageType.COMPREHENSIVE ? validatedData.minimumPremium : null,
         minTonnage: validatedData.minTonnage ?? null,
         maxTonnage: validatedData.maxTonnage ?? null,
-        seats: validatedData.seats ?? null,
+        Seats: validatedData.seats ?? null,
       },
     });
 
@@ -181,7 +181,7 @@ exports.updateProduct = async (req, res) => {
         minimumPremium: coverage === CoverageType.COMPREHENSIVE ? validatedData.minimumPremium : null,
         minTonnage: validatedData.minTonnage ?? null,
         maxTonnage: validatedData.maxTonnage ?? null,
-        seats: validatedData.seats ?? null,
+        Seats: validatedData.seats ?? null,
       },
     });
 
