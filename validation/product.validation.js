@@ -26,7 +26,7 @@ const vehicleClasses = [
   "PRIME_MOVER"
 ];
 
-// Kenyan underwriters (names only — must exist in DB)
+// Kenyan underwriters
 const underwriters = [
   'AAR Insurance (Kenya) Ltd',
   'Africa Merchant Assurance Company Ltd (AMACO)',
@@ -76,8 +76,6 @@ const productValidationSchema = Joi.object({
   name: Joi.string().required(),
   description: Joi.string().allow("", null).optional(),
 
-  // ✅ validate as string (client provides name),
-  // later in controller we map it to { connect: { name } }
   underwriter: Joi.string().valid(...underwriters).required(),
 
   agentcode: Joi.string().required(),
@@ -85,7 +83,7 @@ const productValidationSchema = Joi.object({
   premium_annual: Joi.number().positive().optional(),
   coverPeriod: Joi.string().allow("", null).optional(),
 
-  // ✅ allow either one string OR array of strings
+  // vehicleClass = string OR array
   vehicleClass: Joi.alternatives().try(
     Joi.string().valid(...vehicleClasses),
     Joi.array().items(Joi.string().valid(...vehicleClasses))
@@ -99,15 +97,7 @@ const productValidationSchema = Joi.object({
     otherwise: Joi.optional().allow(null)
   }),
 
-  passengers: Joi.number().integer().optional(),
-  tonnage: Joi.number().integer().optional(),
-  minAge: Joi.number().integer().optional(),
-  maxAge: Joi.number().integer().optional(),
-  minValue: Joi.number().positive().optional(),
-  maxValue: Joi.number().positive().optional(),
-  ExcludedMakes: Joi.array().items(Joi.string()).optional(),
-
-  // ✅ PSV-specific premium fields
+  // PSV-specific
   premium_week: Joi.number().positive().when("vehicleClass", {
     is: Joi.alternatives().try("PSV_MATATU", "PSV_BUS"),
     then: Joi.optional(),
@@ -139,7 +129,17 @@ const productValidationSchema = Joi.object({
     otherwise: Joi.forbidden()
   }),
 
-  yearOfManufacture: Joi.any().forbidden() // ✅ not allowed on product
+  // Risk ranges
+  minAge: Joi.number().integer().min(0).optional(),
+  maxAge: Joi.number().integer().min(Joi.ref("minAge")).optional(),
+  minValue: Joi.number().positive().optional(),
+  maxValue: Joi.number().positive().min(Joi.ref("minValue")).optional(),
+  minTonnage: Joi.number().integer().min(0).optional(),
+  maxTonnage: Joi.number().integer().min(Joi.ref("minTonnage")).optional(),
+
+  ExcludedMakes: Joi.array().items(Joi.string()).optional(),
+
+  yearOfManufacture: Joi.any().forbidden() // not allowed on product
 });
 
 module.exports = {
