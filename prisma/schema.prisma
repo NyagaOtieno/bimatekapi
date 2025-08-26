@@ -48,12 +48,12 @@ model Product {
   coverage         CoverageType
 
   // PSV-specific
-  minSeats         Int?           // ✅ replacing generic Seats
-  maxSeats         Int?           // ✅ replacing generic Seats
-
+  Seats         Int?           // ✅ replacing generic Seats
+ 
   // Goods/commercial-specific
-  minTonnage       Int?           // ✅ already present
-  maxTonnage       Int?           // ✅ already present
+ tonnage Int?   // single value
+  minTonnage Int?
+  maxTonnage Int?
 
   // Comprehensive-specific
   minAge           Int?           

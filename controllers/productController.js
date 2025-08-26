@@ -34,7 +34,7 @@ function validateProductRules(data) {
       if (!Array.isArray(ExcludedMakes)) throw new Error("ExcludedMakes must be an array for COMPREHENSIVE");
       break;
 
-    case CoverageType.THIRD_PARTY_FIRE_AND_THEFT:
+    case CoverageType.THIRD_PARTY_FIRE AND THEFT:
       if (minAge == null || maxAge == null) throw new Error("minAge and maxAge are required for TPF&T");
       if (minValue == null || maxValue == null) throw new Error("minValue and maxValue are required for TPF&T");
       if (!Array.isArray(ExcludedMakes)) throw new Error("ExcludedMakes must be an array for TPF&T");
@@ -70,6 +70,9 @@ async function checkDuplicateProduct(validatedData, underwriterId, excludeId = n
       minValue: validatedData.minValue ?? null,
       maxValue: validatedData.maxValue ?? null,
       tonnage: validatedData.tonnage ?? null,
+      minTonnage: validatedData.minTonnage ?? null,
+      maxTonnage: validatedData.maxTonnage ?? null,
+      seats: validatedData.seats ?? null,
       id: excludeId ? { not: excludeId } : undefined,
     },
   });
@@ -96,7 +99,7 @@ exports.createProduct = async (req, res) => {
 
     const duplicate = await checkDuplicateProduct(validatedData, underwriter.id);
     if (duplicate) {
-      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value range or tonnage" });
+      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value range, tonnage, or seats" });
     }
 
     const product = await prisma.product.create({
@@ -105,6 +108,9 @@ exports.createProduct = async (req, res) => {
         underwriter: { connect: { id: underwriter.id } },
         underwriterName: underwriter.name, // ✅ Save readable name
         minimumPremium: coverage === CoverageType.COMPREHENSIVE ? validatedData.minimumPremium : null,
+        minTonnage: validatedData.minTonnage ?? null,
+        maxTonnage: validatedData.maxTonnage ?? null,
+        seats: validatedData.seats ?? null,
       },
     });
 
@@ -163,7 +169,7 @@ exports.updateProduct = async (req, res) => {
 
     const duplicate = await checkDuplicateProduct(validatedData, underwriterId, id);
     if (duplicate) {
-      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value range or tonnage" });
+      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value range, tonnage, or seats" });
     }
 
     const updatedProduct = await prisma.product.update({
@@ -173,6 +179,9 @@ exports.updateProduct = async (req, res) => {
         ...underwriterData,
         underwriterName, // ✅ Save readable name
         minimumPremium: coverage === CoverageType.COMPREHENSIVE ? validatedData.minimumPremium : null,
+        minTonnage: validatedData.minTonnage ?? null,
+        maxTonnage: validatedData.maxTonnage ?? null,
+        seats: validatedData.seats ?? null,
       },
     });
 
