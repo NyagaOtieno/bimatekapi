@@ -45,15 +45,15 @@ model Product {
   // Risk definitions
   coverPeriod      CoverPeriod?   // period supported (one of enum)
   vehicleClass     VehicleClass[]
-  coverage         CoverageType
+  coverage         CoverageType   // ✅ enum supports TPO, TPFT, Comprehensive
 
   // PSV-specific
-  Seats         Int?           // ✅ replacing generic Seats
- 
+  Seats            Int?           
+
   // Goods/commercial-specific
- tonnage Int?   // single value
-  minTonnage Int?
-  maxTonnage Int?
+  tonnage          Int?
+  minTonnage       Int?
+  maxTonnage       Int?
 
   // Comprehensive-specific
   minAge           Int?           
@@ -73,6 +73,7 @@ model Product {
   @@index([coverage, agentcode, underwriterId], map: "Product_coverage_agentcode_underwriter_idx")
   @@index([underwriterName], map: "Product_underwriterName_idx")
 }
+
 
 model PsvPremium {
   id             Int       @id @default(autoincrement())

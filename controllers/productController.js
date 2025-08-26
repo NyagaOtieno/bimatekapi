@@ -11,11 +11,15 @@ const { productValidationSchema } = require("../validation/product.validation");
  */
 function normalizeCoverage(value) {
   if (!value) return undefined;
+
   const map = {
     "THIRD PARTY ONLY": CoverageType.THIRD_PARTY_ONLY,
+    "THIRD_PARTY_ONLY": CoverageType.THIRD_PARTY_ONLY, // ✅ added
     "THIRD PARTY FIRE AND THEFT": CoverageType.THIRD_PARTY_FIRE_AND_THEFT,
-    "COMPREHENSIVE": CoverageType.COMPREHENSIVE
+    "THIRD_PARTY_FIRE_AND_THEFT": CoverageType.THIRD_PARTY_FIRE_AND_THEFT, // ✅ added
+    "COMPREHENSIVE": CoverageType.COMPREHENSIVE,
   };
+
   const key = value.trim().toUpperCase();
   return map[key] || undefined;
 }
@@ -24,7 +28,7 @@ function normalizeCoverage(value) {
  * Validate product rules based on coverage type
  */
 function validateProductRules(data) {
-  const { coverage, vehicleClass, coverPeriod, passengers, tonnage, minAge, maxAge, minValue, maxValue, ExcludedMakes, minimumPremium } = data;
+  const { coverage, vehicleClass, coverPeriod, tonnage, minAge, maxAge, minValue, maxValue, ExcludedMakes, minimumPremium } = data;
 
   switch (coverage) {
     case CoverageType.COMPREHENSIVE:
@@ -49,7 +53,7 @@ function validateProductRules(data) {
       break;
 
     default:
-      throw new Error("Unsupported coverage type");
+      throw new Error(`Unsupported coverage type: ${coverage}`); // ✅ clearer error
   }
 }
 
