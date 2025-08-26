@@ -1,199 +1,174 @@
-const { PrismaClient, CoverageType } = require('@prisma/client');
+const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
-const { productValidationSchema } = require("../validation/product.validation");
 
-// ========================
-// Helper Functions
-// ========================
+const COVER_PERIOD_MAP = {
+  ONE_WEEK: "premium_week",
+  TWO_WEEKS: "premium_2weeks",
+  ONE_MONTH: "premium_month",
+  THREE_MONTHS: "premium_3months",
+  SIX_MONTHS: "premium_6months",
+  ONE_YEAR: "basePremium",   // ✅ For TPO / TPFT
+  ANNUAL: "premium_annual",  // ✅ For Comprehensive (rate %)
+};
 
-/**
- * Normalize coverage strings to match Prisma enum
- */
-function normalizeCoverage(value) {
-  if (!value) return undefined;
-  const map = {
-    "THIRD PARTY ONLY": CoverageType.THIRD_PARTY_ONLY,
-    "THIRD PARTY FIRE AND THEFT": CoverageType.THIRD_PARTY_FIRE_AND_THEFT,
-    "COMPREHENSIVE": CoverageType.COMPREHENSIVE
-  };
-  const key = value.trim().toUpperCase();
-  return map[key] || undefined;
+function normalize(str) {
+  return str ? str.toUpperCase().replace(/\s+/g, "_") : null;
 }
 
-/**
- * Validate product rules based on coverage type
- */
-function validateProductRules(data) {
-  const { coverage, vehicleClass, coverPeriod, Seats, minTonnage, maxTonnage, minAge, maxAge, minValue, maxValue, ExcludedMakes, minimumPremium } = data;
+// ========================
+// Premium Calculation
+// ========================
+function calculatePremium(product, coverage, coverPeriod, vehicleValue, passengers) {
+  let premium = null;
 
-  switch (coverage) {
-    case CoverageType.COMPREHENSIVE:
-      if (minimumPremium == null) throw new Error("minimumPremium is required for COMPREHENSIVE cover");
-      if (minAge == null || maxAge == null) throw new Error("minAge and maxAge are required for COMPREHENSIVE");
-      if (minValue == null || maxValue == null) throw new Error("minValue and maxValue are required for COMPREHENSIVE");
-      if (!Array.isArray(ExcludedMakes)) throw new Error("ExcludedMakes must be an array for COMPREHENSIVE");
-      break;
+  // ✅ Comprehensive
+  if (coverage === "COMPREHENSIVE") {
+    if (coverPeriod !== "ANNUAL") {
+      throw new Error("Comprehensive only supports ANNUAL cover");
+    }
+    if (vehicleValue == null) return null;
 
-    case CoverageType.THIRD_PARTY_FIRE_AND_THEFT:
-      if (minAge == null || maxAge == null) throw new Error("minAge and maxAge are required for TPF&T");
-      if (minValue == null || maxValue == null) throw new Error("minValue and maxValue are required for TPF&T");
-      if (!Array.isArray(ExcludedMakes)) throw new Error("ExcludedMakes must be an array for TPF&T");
-      break;
-
-    case CoverageType.THIRD_PARTY_ONLY:
-      if (!coverPeriod) throw new Error("coverPeriod is required for THIRD_PARTY_ONLY");
-      if (vehicleClass.some(vc => vc.includes("OWN_GOODS") || vc.includes("GENERAL_CARTAGE"))) {
-        if (minTonnage == null || maxTonnage == null) throw new Error("minTonnage and maxTonnage are required for OWN_GOODS or GENERAL_CARTAGE vehicles");
-      }
-      // ✅ Seats validation now optional; handled elsewhere
-      break;
-
-    default:
-      throw new Error("Unsupported coverage type");
+    const calcPremium = (vehicleValue * (product.premium_annual || 0)) / 100;
+    premium = Math.max(calcPremium, product.minimumPremium || 0);
   }
-}
 
-/**
- * Check for duplicate product
- */
-async function checkDuplicateProduct(validatedData, underwriterId, excludeId = null) {
-  const coverageEnum = normalizeCoverage(validatedData.coverage); 
+  // ✅ PSV (Matatu / Bus) → per seat × coverPeriod premium
+  else if (
+    (coverage === "THIRD_PARTY_ONLY" || coverage === "THIRD_PARTY_FIRE_AND_THEFT") &&
+    (product.vehicleClass.includes("PSV_MATATU") || product.vehicleClass.includes("PSV_BUS"))
+  ) {
+    if (!passengers) return null;
+    const premiumField = COVER_PERIOD_MAP[coverPeriod];
+    if (!premiumField) return null;
+    premium = (product[premiumField] || 0) * passengers;
+  }
 
-  return prisma.product.findFirst({
-    where: {
-      underwriterId,
-      agentcode: validatedData.agentcode,
-      coverage: coverageEnum,
-      vehicleClass: { hasSome: validatedData.vehicleClass },
-      minAge: validatedData.minAge ?? null,
-      maxAge: validatedData.maxAge ?? null,
-      minValue: validatedData.minValue ?? null,
-      maxValue: validatedData.maxValue ?? null,
-      Seats: validatedData.Seats ?? null, // ✅ corrected casing
-      minTonnage: validatedData.minTonnage ?? null,
-      maxTonnage: validatedData.maxTonnage ?? null,
-      id: excludeId ? { not: excludeId } : undefined,
-    },
-  });
+  // ✅ All other TPO / TPFT
+  else if (coverage === "THIRD_PARTY_ONLY" || coverage === "THIRD_PARTY_FIRE_AND_THEFT") {
+    const premiumField = COVER_PERIOD_MAP[coverPeriod];
+    premium = premiumField ? product[premiumField] : product.basePremium;
+  }
+
+  // ✅ fallback
+  else {
+    const premiumField = COVER_PERIOD_MAP[coverPeriod];
+    premium = premiumField ? product[premiumField] : product.basePremium;
+  }
+
+  return premium;
 }
 
 // ========================
-// Controller Methods
+// Eligibility Check
 // ========================
+function checkEligibility(product, filters) {
+  const { vehicleValue, vehicleAge, tonnage, agentCode, make } = filters;
 
-exports.createProduct = async (req, res) => {
+  if (product.agentcode && agentCode && product.agentcode !== agentCode) return false;
+
+  if (vehicleValue != null) {
+    if ((product.minValue != null && vehicleValue < product.minValue) ||
+        (product.maxValue != null && vehicleValue > product.maxValue)) {
+      return false;
+    }
+  }
+
+  if (vehicleAge != null) {
+    if ((product.minAge != null && vehicleAge < product.minAge) ||
+        (product.maxAge != null && vehicleAge > product.maxAge)) {
+      return false;
+    }
+  }
+
+  if ((product.vehicleClass.includes("MOTORVEHICLE_OWN_GOODS") ||
+       product.vehicleClass.includes("MOTORVEHICLE_GENERAL_CARTAGE")) &&
+      tonnage != null) {
+    if ((product.minTonnage != null && tonnage < product.minTonnage) ||
+        (product.maxTonnage != null && tonnage > product.maxTonnage)) {
+      return false;
+    }
+  }
+
+  if (make && product.excludedMakes && product.excludedMakes.includes(make.toUpperCase())) {
+    return false;
+  }
+
+  return true;
+}
+
+// ========================
+// Fetch Quote Controller
+// ========================
+exports.fetchQuote = async (req, res) => {
   try {
-    const { error, value } = productValidationSchema.validate(req.body);
-    if (error) return res.status(400).json({ message: error.details[0].message });
+    let {
+      vehicleClass,
+      coverage,
+      coverPeriod,
+      vehicleValue,
+      yearOfManufacture,
+      tonnage,
+      passengers,
+      agentCode,
+      make,
+    } = req.body;
 
-    const coverage = normalizeCoverage(value.coverage);
-    const vehicleClass = Array.isArray(value.vehicleClass) ? value.vehicleClass : [value.vehicleClass].filter(Boolean);
-    const ExcludedMakes = Array.isArray(value.ExcludedMakes) ? value.ExcludedMakes : [];
+    vehicleClass = normalize(vehicleClass);
+    coverage = normalize(coverage);
+    coverPeriod = coverPeriod ? normalize(coverPeriod) : null;
 
-    const validatedData = { ...value, coverage, vehicleClass, ExcludedMakes };
-    validateProductRules(validatedData);
-
-    const underwriter = await prisma.underwriter.findUnique({ where: { name: validatedData.underwriter } });
-    if (!underwriter) return res.status(400).json({ message: `Underwriter '${validatedData.underwriter}' not found` });
-
-    const duplicate = await checkDuplicateProduct(validatedData, underwriter.id);
-    if (duplicate) {
-      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value range, seats or tonnage" });
+    if (!vehicleClass || !coverage) {
+      return res.status(400).json({ message: "vehicleClass and coverage are required" });
     }
 
-    const product = await prisma.product.create({
-      data: {
-        ...validatedData,
-        underwriter: { connect: { id: underwriter.id } },
-        underwriterName: underwriter.name, // ✅ Save readable name
-        minimumPremium: coverage === CoverageType.COMPREHENSIVE ? validatedData.minimumPremium : null,
+    const vehicleAge = yearOfManufacture ? new Date().getFullYear() - yearOfManufacture : null;
+
+    const products = await prisma.product.findMany({
+      where: {
+        vehicleClass: { has: vehicleClass },
+        coverage,
       },
+      include: { underwriter: true },
     });
 
-    res.status(201).json({ message: 'Product created successfully', product });
+    console.log("Products fetched:", products.length);
+
+    if (!products.length) return res.status(404).json({ message: "No matching product found" });
+
+    const quotes = products
+      .filter((product) => {
+        const eligible = checkEligibility(product, { vehicleValue, vehicleAge, tonnage, agentCode, make });
+        if (!eligible) console.log(`Product ${product.name} not eligible`);
+        return eligible;
+      })
+      .map((product) => {
+        let premium;
+        try {
+          premium = calculatePremium(product, coverage, coverPeriod, vehicleValue, passengers);
+        } catch (err) {
+          return { error: err.message, productId: product.id };
+        }
+
+        return {
+          productId: product.id,
+          productName: product.name,
+          underwriter: product.underwriter?.name || "Unknown",
+          vehicleClass,
+          coverage,
+          coverPeriod: coverPeriod || "BASE",
+          passengers: passengers || null,
+          rate: product.premium_annual,
+          minimumPremium: product.minimumPremium,
+          premium,
+        };
+      })
+      .filter((q) => q.premium != null);
+
+    if (!quotes.length) return res.status(404).json({ message: "No eligible product found" });
+
+    return res.json({ message: "Quotes fetched successfully", count: quotes.length, data: quotes });
   } catch (err) {
-    console.error("❌ Error creating product:", err);
-    res.status(400).json({ message: err.message });
-  }
-};
-
-exports.getProducts = async (req, res) => {
-  try {
-    const products = await prisma.product.findMany({ include: { underwriter: true } });
-    res.json(products);
-  } catch (err) {
-    console.error("❌ Error fetching products:", err);
-    res.status(500).json({ message: "Failed to fetch products" });
-  }
-};
-
-exports.getProductById = async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const product = await prisma.product.findUnique({ where: { id }, include: { underwriter: true } });
-    if (!product) return res.status(404).json({ message: "Product not found" });
-    res.json(product);
-  } catch (err) {
-    console.error("❌ Error fetching product:", err);
-    res.status(500).json({ message: err.message });
-  }
-};
-
-exports.updateProduct = async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const { error, value } = productValidationSchema.validate(req.body);
-    if (error) return res.status(400).json({ message: error.details[0].message });
-
-    const coverage = normalizeCoverage(value.coverage);
-    const vehicleClass = Array.isArray(value.vehicleClass) ? value.vehicleClass : [value.vehicleClass].filter(Boolean);
-    const ExcludedMakes = Array.isArray(value.ExcludedMakes) ? value.ExcludedMakes : [];
-
-    const validatedData = { ...value, coverage, vehicleClass, ExcludedMakes };
-    validateProductRules(validatedData);
-
-    let underwriterData = {};
-    let underwriterId;
-    let underwriterName;
-    if (validatedData.underwriter) {
-      const underwriter = await prisma.underwriter.findUnique({ where: { name: validatedData.underwriter } });
-      if (!underwriter) return res.status(400).json({ message: `Underwriter '${validatedData.underwriter}' not found` });
-      underwriterData = { underwriter: { connect: { id: underwriter.id } } };
-      underwriterId = underwriter.id;
-      underwriterName = underwriter.name;
-    }
-
-    const duplicate = await checkDuplicateProduct(validatedData, underwriterId, id);
-    if (duplicate) {
-      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value range, seats or tonnage" });
-    }
-
-    const updatedProduct = await prisma.product.update({
-      where: { id },
-      data: {
-        ...validatedData,
-        ...underwriterData,
-        underwriterName, // ✅ Save readable name
-        minimumPremium: coverage === CoverageType.COMPREHENSIVE ? validatedData.minimumPremium : null,
-      },
-    });
-
-    res.json({ message: 'Product updated successfully', product: updatedProduct });
-  } catch (err) {
-    console.error("❌ Error updating product:", err);
-    if (err.code === 'P2025') return res.status(404).json({ message: 'Product not found' });
-    res.status(400).json({ message: err.message });
-  }
-};
-
-exports.deleteProduct = async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    await prisma.product.delete({ where: { id } });
-    res.json({ message: "Product deleted successfully" });
-  } catch (err) {
-    console.error("❌ Error deleting product:", err);
-    if (err.code === 'P2025') return res.status(404).json({ message: 'Product not found' });
-    res.status(500).json({ message: err.message });
+    console.error("❌ Error fetching quote:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };
