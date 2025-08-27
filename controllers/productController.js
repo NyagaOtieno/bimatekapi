@@ -6,8 +6,12 @@ const { productValidationSchema } = require("../validation/product.validation");
 // Helper Functions
 // ========================
 
+/**
+ * Normalize coverage strings to match Prisma enum
+ */
 function normalizeCoverage(value) {
   if (!value) return undefined;
+
   const map = {
     "THIRD PARTY ONLY": CoverageType.THIRD_PARTY_ONLY,
     "THIRD_PARTY_ONLY": CoverageType.THIRD_PARTY_ONLY,
@@ -15,10 +19,14 @@ function normalizeCoverage(value) {
     "THIRD_PARTY_FIRE_AND_THEFT": CoverageType.THIRD_PARTY_FIRE_AND_THEFT,
     "COMPREHENSIVE": CoverageType.COMPREHENSIVE,
   };
+
   const key = value.trim().toUpperCase();
   return map[key] || undefined;
 }
 
+/**
+ * Validate product rules based on coverage type
+ */
 function validateProductRules(data) {
   const { coverage, vehicleClass, coverPeriod, tonnage, minTonnage, maxTonnage, minAge, maxAge, minValue, maxValue, ExcludedMakes, minimumPremium } = data;
 
@@ -38,6 +46,8 @@ function validateProductRules(data) {
 
     case CoverageType.THIRD_PARTY_ONLY:
       if (!coverPeriod) throw new Error("coverPeriod is required for THIRD_PARTY_ONLY");
+
+      // For goods vehicles, require tonnage range
       if (vehicleClass.some(vc => vc.includes("OWN_GOODS") || vc.includes("GENERAL_CARTAGE"))) {
         if ((tonnage == null) && (minTonnage == null || maxTonnage == null)) {
           throw new Error("tonnage or minTonnage+maxTonnage is required for OWN_GOODS or GENERAL_CARTAGE vehicles");
@@ -67,62 +77,10 @@ async function checkDuplicateProduct(validatedData, underwriterId, excludeId = n
       tonnage: validatedData.tonnage ?? null,
       minTonnage: validatedData.minTonnage ?? null,
       maxTonnage: validatedData.maxTonnage ?? null,
-      Seats: validatedData.Seats ?? null,
+      Seats: validatedData.Seats ?? null, // ✅ consistent with Prisma model
       id: excludeId ? { not: excludeId } : undefined,
     },
   });
-}
-
-/**
- * Check for overlapping ranges (age, value, tonnage)
- */
-async function checkRangeOverlap(validatedData, underwriterId, excludeId = null) {
-  const { vehicleClass, coverage, minAge, maxAge, minValue, maxValue, minTonnage, maxTonnage } = validatedData;
-
-  // Age range overlap
-  if (minAge != null && maxAge != null) {
-    const overlappingAge = await prisma.product.findFirst({
-      where: {
-        underwriterId,
-        coverage,
-        vehicleClass: { hasSome: vehicleClass },
-        minAge: { lte: maxAge },
-        maxAge: { gte: minAge },
-        id: excludeId ? { not: excludeId } : undefined,
-      },
-    });
-    if (overlappingAge) throw new Error('Age range overlaps with an existing product');
-  }
-
-  // Value range overlap
-  if (minValue != null && maxValue != null) {
-    const overlappingValue = await prisma.product.findFirst({
-      where: {
-        underwriterId,
-        coverage,
-        vehicleClass: { hasSome: vehicleClass },
-        minValue: { lte: maxValue },
-        maxValue: { gte: minValue },
-        id: excludeId ? { not: excludeId } : undefined,
-      },
-    });
-    if (overlappingValue) throw new Error('Vehicle value range overlaps with an existing product');
-  }
-
-  // Tonnage range overlap
-  if (minTonnage != null && maxTonnage != null) {
-    const overlappingTonnage = await prisma.product.findFirst({
-      where: {
-        underwriterId,
-        coverage,
-        vehicleClass: { hasSome: vehicleClass },
-        minTonnage: { lte: maxTonnage },
-        maxTonnage: { gte: minTonnage },
-        id: excludeId ? { not: excludeId } : undefined,
-      },
-    });
-    if (overlappingTonnage) throw new Error('Tonnage range overlaps with an existing product');
-  }
 }
 
 // ========================
@@ -144,10 +102,9 @@ exports.createProduct = async (req, res) => {
     const underwriter = await prisma.underwriter.findUnique({ where: { name: validatedData.underwriter } });
     if (!underwriter) return res.status(400).json({ message: `Underwriter '${validatedData.underwriter}' not found` });
 
-    await checkRangeOverlap(validatedData, underwriter.id);
     const duplicate = await checkDuplicateProduct(validatedData, underwriter.id);
     if (duplicate) {
-      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, and range/seats" });
+      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value/tonnage/seats" });
     }
 
     const product = await prisma.product.create({
@@ -166,6 +123,28 @@ exports.createProduct = async (req, res) => {
   } catch (err) {
     console.error("❌ Error creating product:", err);
     res.status(400).json({ message: err.message });
+  }
+};
+
+exports.getProducts = async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({ include: { underwriter: true } });
+    res.json(products);
+  } catch (err) {
+    console.error("❌ Error fetching products:", err);
+    res.status(500).json({ message: "Failed to fetch products" });
+  }
+};
+
+exports.getProductById = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const product = await prisma.product.findUnique({ where: { id }, include: { underwriter: true } });
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    res.json(product);
+  } catch (err) {
+    console.error("❌ Error fetching product:", err);
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -193,10 +172,9 @@ exports.updateProduct = async (req, res) => {
       underwriterName = underwriter.name;
     }
 
-    await checkRangeOverlap(validatedData, underwriterId, id);
     const duplicate = await checkDuplicateProduct(validatedData, underwriterId, id);
     if (duplicate) {
-      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, and range/seats" });
+      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value/tonnage/seats" });
     }
 
     const updatedProduct = await prisma.product.update({
