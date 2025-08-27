@@ -82,6 +82,58 @@ async function checkDuplicateProduct(validatedData, underwriterId, excludeId = n
     },
   });
 }
+/**
+ * Check for overlapping ranges (age, value, tonnage)
+ */
+async function checkRangeOverlap(validatedData, underwriterId, excludeId = null) {
+  const { vehicleClass, coverage, minAge, maxAge, minValue, maxValue, minTonnage, maxTonnage } = validatedData;
+
+  // Age range overlap
+  if (minAge != null && maxAge != null) {
+    const overlappingAge = await prisma.product.findFirst({
+      where: {
+        underwriterId,
+        coverage,
+        vehicleClass: { hasSome: vehicleClass },
+        minAge: { lte: maxAge },
+        maxAge: { gte: minAge },
+        id: excludeId ? { not: excludeId } : undefined,
+      },
+    });
+    if (overlappingAge) throw new Error("Age range overlaps with an existing product");
+  }
+
+  // Value range overlap
+  if (minValue != null && maxValue != null) {
+    const overlappingValue = await prisma.product.findFirst({
+      where: {
+        underwriterId,
+        coverage,
+        vehicleClass: { hasSome: vehicleClass },
+        minValue: { lte: maxValue },
+        maxValue: { gte: minValue },
+        id: excludeId ? { not: excludeId } : undefined,
+      },
+    });
+    if (overlappingValue) throw new Error("Vehicle value range overlaps with an existing product");
+  }
+
+  // Tonnage range overlap
+  if (minTonnage != null && maxTonnage != null) {
+    const overlappingTonnage = await prisma.product.findFirst({
+      where: {
+        underwriterId,
+        coverage,
+        vehicleClass: { hasSome: vehicleClass },
+        minTonnage: { lte: maxTonnage },
+        maxTonnage: { gte: minTonnage },
+        id: excludeId ? { not: excludeId } : undefined,
+      },
+    });
+    if (overlappingTonnage) throw new Error("Tonnage range overlaps with an existing product");
+  }
+}
+
 
 // ========================
 // Controller Methods
