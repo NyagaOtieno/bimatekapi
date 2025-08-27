@@ -206,6 +206,23 @@ exports.updateProduct = async (req, res) => {
       },
     });
 
+ 
     res.json({ message: 'Product updated successfully', product: updatedProduct });
   } catch (err) {
-    console.error("❌ Error
+    console.error("❌ Error updating product:", err);
+    if (err.code === 'P2025') return res.status(404).json({ message: 'Product not found' });
+    res.status(400).json({ message: err.message });
+  }
+};
+
+exports.deleteProduct = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await prisma.product.delete({ where: { id } });
+    res.json({ message: "Product deleted successfully" });
+  } catch (err) {
+    console.error("❌ Error deleting product:", err);
+    if (err.code === 'P2025') return res.status(404).json({ message: 'Product not found' });
+    res.status(500).json({ message: err.message });
+  }
+};
