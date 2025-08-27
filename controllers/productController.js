@@ -29,11 +29,13 @@ function validateProductRules(data) {
       if (minValue == null || maxValue == null) throw new Error("minValue and maxValue are required for COMPREHENSIVE");
       if (!Array.isArray(ExcludedMakes)) throw new Error("ExcludedMakes must be an array for COMPREHENSIVE");
       break;
+
     case CoverageType.THIRD_PARTY_FIRE_AND_THEFT:
       if (minAge == null || maxAge == null) throw new Error("minAge and maxAge are required for TPF&T");
       if (minValue == null || maxValue == null) throw new Error("minValue and maxValue are required for TPF&T");
       if (!Array.isArray(ExcludedMakes)) throw new Error("ExcludedMakes must be an array for TPF&T");
       break;
+
     case CoverageType.THIRD_PARTY_ONLY:
       if (!coverPeriod) throw new Error("coverPeriod is required for THIRD_PARTY_ONLY");
       if (vehicleClass.some(vc => vc.includes("OWN_GOODS") || vc.includes("GENERAL_CARTAGE"))) {
@@ -42,6 +44,7 @@ function validateProductRules(data) {
         }
       }
       break;
+
     default:
       throw new Error(`Unsupported coverage type: ${coverage}`);
   }
@@ -71,11 +74,12 @@ async function checkDuplicateProduct(validatedData, underwriterId, excludeId = n
 }
 
 /**
- * Check for overlapping ranges
+ * Check for overlapping ranges (age, value, tonnage)
  */
 async function checkRangeOverlap(validatedData, underwriterId, excludeId = null) {
   const { vehicleClass, coverage, minAge, maxAge, minValue, maxValue, minTonnage, maxTonnage } = validatedData;
 
+  // Age range overlap
   if (minAge != null && maxAge != null) {
     const overlappingAge = await prisma.product.findFirst({
       where: {
@@ -87,9 +91,10 @@ async function checkRangeOverlap(validatedData, underwriterId, excludeId = null)
         id: excludeId ? { not: excludeId } : undefined,
       },
     });
-    if (overlappingAge) throw new Error('Age range overlaps with existing product');
+    if (overlappingAge) throw new Error('Age range overlaps with an existing product');
   }
 
+  // Value range overlap
   if (minValue != null && maxValue != null) {
     const overlappingValue = await prisma.product.findFirst({
       where: {
@@ -101,9 +106,10 @@ async function checkRangeOverlap(validatedData, underwriterId, excludeId = null)
         id: excludeId ? { not: excludeId } : undefined,
       },
     });
-    if (overlappingValue) throw new Error('Vehicle value range overlaps with existing product');
+    if (overlappingValue) throw new Error('Vehicle value range overlaps with an existing product');
   }
 
+  // Tonnage range overlap
   if (minTonnage != null && maxTonnage != null) {
     const overlappingTonnage = await prisma.product.findFirst({
       where: {
@@ -115,7 +121,7 @@ async function checkRangeOverlap(validatedData, underwriterId, excludeId = null)
         id: excludeId ? { not: excludeId } : undefined,
       },
     });
-    if (overlappingTonnage) throw new Error('Tonnage range overlaps with existing product');
+    if (overlappingTonnage) throw new Error('Tonnage range overlaps with an existing product');
   }
 }
 
@@ -138,10 +144,10 @@ exports.createProduct = async (req, res) => {
     const underwriter = await prisma.underwriter.findUnique({ where: { name: validatedData.underwriter } });
     if (!underwriter) return res.status(400).json({ message: `Underwriter '${validatedData.underwriter}' not found` });
 
-    await checkRangeOverlap(validatedData, underwriter.id); // ✅ prevent overlapping ranges
+    await checkRangeOverlap(validatedData, underwriter.id);
     const duplicate = await checkDuplicateProduct(validatedData, underwriter.id);
     if (duplicate) {
-      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value/tonnage/seats" });
+      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, and range/seats" });
     }
 
     const product = await prisma.product.create({
@@ -187,10 +193,10 @@ exports.updateProduct = async (req, res) => {
       underwriterName = underwriter.name;
     }
 
-    await checkRangeOverlap(validatedData, underwriterId, id); // ✅ prevent overlapping ranges
+    await checkRangeOverlap(validatedData, underwriterId, id);
     const duplicate = await checkDuplicateProduct(validatedData, underwriterId, id);
     if (duplicate) {
-      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, age/value/tonnage/seats" });
+      return res.status(400).json({ message: "Duplicate product exists with same underwriter, vehicle class, coverage, agent code, and range/seats" });
     }
 
     const updatedProduct = await prisma.product.update({
@@ -206,7 +212,6 @@ exports.updateProduct = async (req, res) => {
       },
     });
 
- 
     res.json({ message: 'Product updated successfully', product: updatedProduct });
   } catch (err) {
     console.error("❌ Error updating product:", err);
