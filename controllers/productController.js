@@ -151,8 +151,9 @@ exports.createProduct = async (req, res) => {
     const validatedData = { ...value, coverage, vehicleClass, ExcludedMakes };
     validateProductRules(validatedData);
 
-    const underwriter = await prisma.underwriter.findUnique({ where: { name: validatedData.underwriter } });
-    if (!underwriter) return res.status(400).json({ message: `Underwriter '${validatedData.underwriter}' not found` });
+   
+    const { ensureUnderwriter } = require("./underwriterController");
+    const underwriter = await ensureUnderwriter(validatedData.underwriter);
 
     const duplicate = await checkDuplicateProduct(validatedData, underwriter.id);
     if (duplicate) {
