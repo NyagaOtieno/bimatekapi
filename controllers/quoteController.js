@@ -22,16 +22,21 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue, passenge
   let premium = null;
 
   // ✅ Comprehensive
+
+
   if (coverage === "COMPREHENSIVE") {
-    if (coverPeriod !== "ANNUAL") {
-      throw new Error("Comprehensive only supports ANNUAL cover");
+    if (!(coverPeriod === "ANNUAL" || coverPeriod === "ONE_YEAR")) {
+      throw new Error("Comprehensive only supports ANNUAL/ONE_YEAR cover");
     }
     if (vehicleValue == null) return null;
 
     const calcPremium = (vehicleValue * (product.premium_annual || 0)) / 100;
     premium = Math.max(calcPremium, product.minimumPremium || 0);
   }
+  
+}
 
+  
   // ✅ PSV (Matatu / Bus) → per seat × coverPeriod premium
   else if (
     (coverage === "THIRD_PARTY_ONLY" || coverage === "THIRD_PARTY_FIRE_AND_THEFT") &&
