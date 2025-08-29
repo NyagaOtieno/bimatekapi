@@ -1,4 +1,4 @@
-// routes/quotes.routes.js
+// routes/quotes.routes.js 
 const express = require("express");
 const router = express.Router();
 const quoteController = require("../../controllers/quoteController");
@@ -8,57 +8,51 @@ const quoteController = require("../../controllers/quoteController");
 // ========================
 
 // Fetch quotes (calculate only, does not save)
-router.post(
-  "/fetch",
-  (req, res, next) =>
-    typeof quoteController.fetchQuote === "function"
-      ? quoteController.fetchQuote(req, res, next)
-      : res.status(500).json({ error: "fetchQuote not implemented" })
-);
+router.post("/fetch", (req, res, next) => {
+  if (typeof quoteController.fetchQuote === "function") {
+    return quoteController.fetchQuote(req, res, next);
+  }
+  return res.status(500).json({ error: "fetchQuote not implemented" });
+});
 
 // Save a quote (persists to DB)
-router.post(
-  "/save",
-  (req, res, next) =>
-    typeof quoteController.createQuote === "function"
-      ? quoteController.createQuote(req, res, next)
-      : res.status(500).json({ error: "createQuote not implemented" })
-);
+router.post("/save", (req, res, next) => {
+  if (typeof quoteController.createQuote === "function") {
+    return quoteController.createQuote(req, res, next);
+  }
+  return res.status(500).json({ error: "createQuote not implemented" });
+});
 
 // Get all saved quotes
-router.get(
-  "/",
-  (req, res, next) =>
-    typeof quoteController.getQuotes === "function"
-      ? quoteController.getQuotes(req, res, next)
-      : res.status(500).json({ error: "getQuotes not implemented" })
-);
+router.get("/", (req, res, next) => {
+  if (typeof quoteController.getQuotes === "function") {
+    return quoteController.getQuotes(req, res, next);
+  }
+  return res.status(500).json({ error: "getQuotes not implemented" });
+});
 
 // Get a single saved quote by ID
-router.get(
-  "/:id",
-  (req, res, next) =>
-    typeof quoteController.getQuoteById === "function"
-      ? quoteController.getQuoteById(req, res, next)
-      : res.status(500).json({ error: "getQuoteById not implemented" })
-);
+router.get("/:id", (req, res, next) => {
+  if (typeof quoteController.getQuoteById === "function") {
+    return quoteController.getQuoteById(req, res, next);
+  }
+  return res.status(500).json({ error: "getQuoteById not implemented" });
+});
 
 // Update a saved quote by ID
-router.put(
-  "/:id",
-  (req, res, next) =>
-    typeof quoteController.updateQuote === "function"
-      ? quoteController.updateQuote(req, res, next)
-      : res.status(500).json({ error: "updateQuote not implemented" })
-);
+router.put("/:id", (req, res, next) => {
+  if (typeof quoteController.updateQuote === "function") {
+    return quoteController.updateQuote(req, res, next);
+  }
+  return res.status(500).json({ error: "updateQuote not implemented" });
+});
 
 // Delete a saved quote by ID
-router.delete(
-  "/:id",
-  (req, res, next) =>
-    typeof quoteController.deleteQuote === "function"
-      ? quoteController.deleteQuote(req, res, next)
-      : res.status(500).json({ error: "deleteQuote not implemented" })
-);
+router.delete("/:id", (req, res, next) => {
+  if (typeof quoteController.deleteQuote === "function") {
+    return quoteController.deleteQuote(req, res, next);
+  }
+  return res.status(500).json({ error: "deleteQuote not implemented" });
+});
 
 module.exports = router;

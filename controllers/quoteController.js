@@ -34,7 +34,6 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue, passenge
     premium = Math.max(calcPremium, product.minimumPremium || 0);
   }
   
-}
 
   
   // ✅ PSV (Matatu / Bus) → per seat × coverPeriod premium
