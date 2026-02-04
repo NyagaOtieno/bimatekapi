@@ -22,8 +22,6 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue, passenge
   let premium = null;
 
   // ✅ Comprehensive
-
-
   if (coverage === "COMPREHENSIVE") {
     if (!(coverPeriod === "ANNUAL" || coverPeriod === "ONE_YEAR")) {
       throw new Error("Comprehensive only supports ANNUAL/ONE_YEAR cover");
@@ -33,9 +31,7 @@ function calculatePremium(product, coverage, coverPeriod, vehicleValue, passenge
     const calcPremium = (vehicleValue * (product.premium_annual || 0)) / 100;
     premium = Math.max(calcPremium, product.minimumPremium || 0);
   }
-  
 
-  
   // ✅ PSV (Matatu / Bus) → per seat × coverPeriod premium
   else if (
     (coverage === "THIRD_PARTY_ONLY" || coverage === "THIRD_PARTY_FIRE_AND_THEFT") &&
@@ -93,7 +89,8 @@ function checkEligibility(product, filters) {
     }
   }
 
-  if (make && product.excludedMakes && product.excludedMakes.includes(make.toUpperCase())) {
+  // ✅ Fixed ExcludedMakes field name
+  if (make && product.ExcludedMakes && product.ExcludedMakes.includes(make.toUpperCase())) {
     return false;
   }
 
@@ -173,6 +170,72 @@ exports.fetchQuote = async (req, res) => {
     return res.json({ message: "Quotes fetched successfully", count: quotes.length, data: quotes });
   } catch (err) {
     console.error("❌ Error fetching quote:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+exports.saveQuote = async (req, res) => {
+  try {
+    const {
+      productId,
+      userId,          // optional, if logged-in user exists
+      vehicleReg,
+      make,
+      model,
+      yearOfManufacture,
+      value,
+      tonnage,
+      passengers,
+      coverage,
+      coverPeriod,
+      agentCode,
+      contactName,
+      email,
+      phoneNumber,
+      price
+    } = req.body;
+
+    // Validate required fields
+    if (!productId || !vehicleReg || !coverage || !coverPeriod || !contactName || !email || !phoneNumber) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    // ✅ Ensure product exists
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // ✅ Save quote
+    const quote = await prisma.quote.create({
+      data: {
+        productId,
+        userId: userId || null,
+        vehicleReg,
+        make,
+        model,
+        yearOfManufacture,
+        value,
+        tonnage,
+        passengers,
+        cover: coverage,
+        coverPeriod,
+        agentCode,
+        price,
+        contactName,
+        email,
+        phoneNumber,
+      },
+    });
+
+    return res.status(201).json({
+      message: "Quote saved successfully. Valid for 30 days.",
+      data: quote,
+    });
+  } catch (err) {
+    console.error("❌ Error saving quote:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
